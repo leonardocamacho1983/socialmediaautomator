@@ -10,6 +10,8 @@ import {
 } from "@/lib/auth";
 import {
   createBrandReference,
+  deleteBrandAsset,
+  deleteBrandReference,
   generateEditorialPlan,
   uploadBrandAsset,
 } from "@/lib/editorial-store";
@@ -222,6 +224,38 @@ export async function createBrandReferenceAction(formData: FormData) {
       error instanceof Error
         ? error.message
         : "Erro ao salvar referência da marca.",
+    );
+  }
+}
+
+export async function deleteBrandAssetAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    await deleteBrandAsset(getFormString(formData, "assetId"));
+
+    revalidatePath("/");
+    redirectWithResult("notice", "Asset da marca deletado.");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao deletar asset.",
+    );
+  }
+}
+
+export async function deleteBrandReferenceAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    await deleteBrandReference(getFormString(formData, "referenceId"));
+
+    revalidatePath("/");
+    redirectWithResult("notice", "Referência deletada.");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao deletar referência.",
     );
   }
 }

@@ -96,7 +96,7 @@ O dashboard permite subir assets proprietários para um bucket privado do Supaba
 
 Os metadados ficam em `brand_assets`; os arquivos ficam no bucket privado `brand-assets`. O bucket é criado automaticamente no primeiro upload se ainda não existir.
 
-Arquivos HTML do design system também são aceitos no upload (`.html`/`.htm`).
+Arquivos HTML do design system também são aceitos no upload (`.html`/`.htm`), assim como pacotes `.zip`.
 
 Para design systems publicados como URL, use o formulário "Adicionar link":
 
@@ -109,3 +109,5 @@ Para design systems publicados como URL, use o formulário "Adicionar link":
 - referência externa
 
 Esses links ficam em `brand_references`.
+
+Assets e referências podem ser deletados pelo dashboard. No caso de asset enviado, o app remove o arquivo do Supabase Storage e depois remove o registro em `brand_assets`.

@@ -14,6 +14,8 @@ import {
 import {
   createPostAction,
   createBrandReferenceAction,
+  deleteBrandAssetAction,
+  deleteBrandReferenceAction,
   generateEditorialPlanAction,
   logoutAction,
   uploadBrandAssetAction,
@@ -492,7 +494,7 @@ function EditorialPanel({
           <div>
             <h4 className="font-medium text-white">Subir arquivo</h4>
             <p className="mt-1 text-xs text-zinc-500">
-              Aceita imagens, vídeos, PDF e HTML.
+              Aceita imagens, vídeos, PDF, HTML e ZIP.
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
@@ -501,7 +503,7 @@ function EditorialPanel({
                 required
                 name="file"
                 type="file"
-                accept="image/*,video/mp4,video/quicktime,application/pdf,text/html,.html,.htm"
+                accept="image/*,video/mp4,video/quicktime,application/pdf,text/html,.html,.htm,.zip,application/zip,application/x-zip-compressed"
                 className="input"
               />
             </Field>
@@ -655,6 +657,16 @@ function EditorialPanel({
                 <p className="mt-2 truncate font-mono text-xs text-zinc-600">
                   {asset.storage_path}
                 </p>
+                <form action={deleteBrandAssetAction} className="mt-4">
+                  <input type="hidden" name="assetId" value={asset.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Deletar
+                  </button>
+                </form>
               </article>
             ))}
           </div>
@@ -667,11 +679,8 @@ function EditorialPanel({
         {status.recentBrandReferences.length ? (
           <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {status.recentBrandReferences.map((reference) => (
-              <a
+              <article
                 key={reference.id}
-                href={reference.url}
-                target="_blank"
-                rel="noreferrer"
                 className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4 transition hover:bg-cyan-300/10"
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -685,10 +694,25 @@ function EditorialPanel({
                 <h4 className="line-clamp-2 font-medium text-white">
                   {reference.title}
                 </h4>
-                <p className="mt-2 truncate text-xs text-zinc-500">
+                <a
+                  href={reference.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block truncate text-xs text-cyan-200 hover:underline"
+                >
                   {reference.url}
-                </p>
-              </a>
+                </a>
+                <form action={deleteBrandReferenceAction} className="mt-4">
+                  <input type="hidden" name="referenceId" value={reference.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Deletar
+                  </button>
+                </form>
+              </article>
             ))}
           </div>
         ) : null}

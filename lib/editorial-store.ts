@@ -65,6 +65,10 @@ export type EditorialStatus = {
   }>;
 };
 
+export type BrandAssetSummary = EditorialStatus["recentBrandAssets"][number];
+export type BrandReferenceSummary =
+  EditorialStatus["recentBrandReferences"][number];
+
 const EMPTY_STATUS: EditorialStatus = {
   configured: false,
   counts: {
@@ -224,6 +228,66 @@ export async function createBrandReference(input: {
   return data;
 }
 
+export async function deleteBrandAsset(assetId: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!assetId) {
+    throw new Error("Asset ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: asset, error: getError } = await supabase
+    .from("brand_assets")
+    .select("id,storage_bucket,storage_path")
+    .eq("id", assetId)
+    .single();
+
+  if (getError) {
+    throw new Error(`Erro ao localizar asset: ${getError.message}`);
+  }
+
+  if (asset?.storage_bucket && asset?.storage_path) {
+    const { error: storageError } = await supabase.storage
+      .from(asset.storage_bucket)
+      .remove([asset.storage_path]);
+
+    if (storageError) {
+      throw new Error(`Erro ao remover arquivo: ${storageError.message}`);
+    }
+  }
+
+  const { error } = await supabase
+    .from("brand_assets")
+    .delete()
+    .eq("id", assetId);
+
+  if (error) {
+    throw new Error(`Erro ao deletar asset: ${error.message}`);
+  }
+}
+
+export async function deleteBrandReference(referenceId: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!referenceId) {
+    throw new Error("Referência ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("brand_references")
+    .delete()
+    .eq("id", referenceId);
+
+  if (error) {
+    throw new Error(`Erro ao deletar referência: ${error.message}`);
+  }
+}
+
 export async function uploadBrandAsset(input: {
   file: File;
   type: string;
@@ -300,6 +364,8 @@ async function ensureBrandAssetsBucket() {
       "video/quicktime",
       "application/pdf",
       "text/html",
+      "application/zip",
+      "application/x-zip-compressed",
     ],
   };
 
@@ -336,6 +402,8 @@ function getSafeExtension(fileName: string, contentType: string) {
   if (contentType === "video/mp4") return ".mp4";
   if (contentType === "application/pdf") return ".pdf";
   if (contentType === "text/html") return ".html";
+  if (contentType === "application/zip") return ".zip";
+  if (contentType === "application/x-zip-compressed") return ".zip";
 
   return "";
 }
