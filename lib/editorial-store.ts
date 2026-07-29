@@ -1,6 +1,23 @@
 import "server-only";
 
+import { generateJsonWithGroq } from "@/lib/groq";
+import { searchPexelsAsset, type PexelsAsset } from "@/lib/pexels";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase";
+
+export type GeneratedDraft = {
+  title: string;
+  platform: "instagram" | "linkedin" | "both";
+  format: string;
+  objective: string;
+  topic: string;
+  viral_hook: string;
+  angle: string;
+  content: string;
+  first_comment?: string;
+  hashtags?: string[];
+  pexels_query?: string;
+  score?: number;
+};
 
 export type EditorialStatus = {
   configured: boolean;
@@ -20,6 +37,13 @@ export type EditorialStatus = {
     zernio_post_id: string | null;
     received_at: string;
   }>;
+  recentDrafts: Array<{
+    id: string;
+    title: string;
+    platform: string;
+    status: string;
+    created_at: string;
+  }>;
 };
 
 const EMPTY_STATUS: EditorialStatus = {
@@ -34,6 +58,7 @@ const EMPTY_STATUS: EditorialStatus = {
     zernioEvents: 0,
   },
   recentEvents: [],
+  recentDrafts: [],
 };
 
 const COUNT_TABLES = {
@@ -53,7 +78,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
 
   const supabase = getSupabaseAdminClient();
 
-  const [counts, recentEvents] = await Promise.all([
+  const [counts, recentEvents, recentDrafts] = await Promise.all([
     Promise.all(
       Object.entries(COUNT_TABLES).map(async ([key, table]) => {
         const { count, error } = await supabase
@@ -72,6 +97,11 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .select("id,event_id,event_type,zernio_post_id,received_at")
       .order("received_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("post_drafts")
+      .select("id,title,platform,status,created_at")
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   if (recentEvents.error) {
@@ -80,11 +110,362 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  if (recentDrafts.error) {
+    throw new Error(
+      `Erro ao listar drafts editoriais: ${recentDrafts.error.message}`,
+    );
+  }
+
   return {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
+    recentDrafts: recentDrafts.data ?? [],
   };
+}
+
+export async function generateEditorialPlan(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  productScope: string;
+  targetAudience: string;
+  personas: string;
+  painsAndRemedies: string;
+  designSystem: string;
+  toneOfVoice: string;
+  postsCount: number;
+  startDate: string;
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const fallback = buildFallbackPlan(input);
+  const startedAt = Date.now();
+  const generated = await generateJsonWithGroq<{ posts: GeneratedDraft[] }>({
+    system:
+      "Você é um planejador editorial sênior para Instagram e LinkedIn. Gere somente JSON válido. Foque em viralização ética, clareza, especificidade e aprovação humana antes de publicação.",
+    prompt: buildPlannerPrompt(input),
+    fallback,
+  });
+  const posts = normalizeGeneratedPosts(generated.data.posts, input.postsCount);
+
+  const { data: generationRun, error: generationError } = await supabase
+    .from("generation_runs")
+    .insert({
+      provider: generated.provider,
+      model: generated.model,
+      task: "generate_editorial_plan",
+      input,
+      output: { posts },
+      status: "completed",
+      duration_ms: Date.now() - startedAt,
+    })
+    .select("id")
+    .single();
+
+  if (generationError) {
+    throw new Error(`Erro ao registrar geração: ${generationError.message}`);
+  }
+
+  const { data: brandProfile, error: brandError } = await supabase
+    .from("brand_profiles")
+    .insert({
+      name: input.businessName || "Meu negócio",
+      business_idea: input.businessIdea,
+      value_proposition: input.valueProposition,
+      product_scope: input.productScope,
+      target_audience: input.targetAudience,
+      tone_of_voice: input.toneOfVoice,
+      design_system_notes: input.designSystem,
+      constraints: input.painsAndRemedies,
+    })
+    .select("id")
+    .single();
+
+  if (brandError) {
+    throw new Error(`Erro ao salvar perfil do negócio: ${brandError.message}`);
+  }
+
+  const pillar = await ensureContentPillar({
+    brandProfileId: brandProfile.id,
+    name: "Viralização com autoridade",
+    description:
+      "Posts desenhados para alcance, clareza da proposta de valor e construção de confiança.",
+  });
+  const savedDrafts: string[] = [];
+
+  for (const [index, post] of posts.entries()) {
+    const scheduledFor = buildScheduleDate(input.startDate, index);
+    const asset = post.pexels_query
+      ? await savePexelsAsset(post.pexels_query, post.format)
+      : null;
+    const { data: calendarItem, error: calendarError } = await supabase
+      .from("content_calendar_items")
+      .insert({
+        brand_profile_id: brandProfile.id,
+        content_pillar_id: pillar.id,
+        scheduled_for: scheduledFor,
+        platform: post.platform,
+        format: post.format,
+        objective: post.objective,
+        topic: post.topic,
+        viral_hook: post.viral_hook,
+        angle: post.angle,
+        status: "drafted",
+        score: post.score ?? null,
+        notes: post.pexels_query
+          ? `Busca Pexels sugerida: ${post.pexels_query}`
+          : "",
+      })
+      .select("id")
+      .single();
+
+    if (calendarError) {
+      throw new Error(`Erro ao salvar calendário: ${calendarError.message}`);
+    }
+
+    const { data: draft, error: draftError } = await supabase
+      .from("post_drafts")
+      .insert({
+        calendar_item_id: calendarItem.id,
+        media_asset_id: asset?.id ?? null,
+        title: post.title,
+        content: post.content,
+        first_comment: post.first_comment ?? "",
+        hashtags: post.hashtags ?? [],
+        platform: post.platform,
+        status: "draft",
+        scheduled_for: scheduledFor,
+        generation_run_id: generationRun.id,
+      })
+      .select("id")
+      .single();
+
+    if (draftError) {
+      throw new Error(`Erro ao salvar draft: ${draftError.message}`);
+    }
+
+    savedDrafts.push(draft.id);
+  }
+
+  return {
+    provider: generated.provider,
+    model: generated.model,
+    generated: posts.length,
+    draftIds: savedDrafts,
+  };
+}
+
+async function ensureContentPillar(input: {
+  brandProfileId: string;
+  name: string;
+  description: string;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("content_pillars")
+    .insert({
+      brand_profile_id: input.brandProfileId,
+      name: input.name,
+      description: input.description,
+      viral_angle:
+        "Hooks fortes, tensão clara, linguagem direta e promessa específica.",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Erro ao salvar pilar editorial: ${error.message}`);
+  }
+
+  return data;
+}
+
+async function savePexelsAsset(query: string, format: string) {
+  const mediaType = /reel|video|short/i.test(format) ? "video" : "image";
+  let asset: PexelsAsset | null = null;
+
+  try {
+    asset = await searchPexelsAsset({ query, mediaType });
+  } catch (error) {
+    console.warn("pexels.search_failed", { query, error });
+  }
+
+  if (!asset) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("media_assets")
+    .insert(asset)
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Erro ao salvar mídia Pexels: ${error.message}`);
+  }
+
+  return data;
+}
+
+function buildPlannerPrompt(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  productScope: string;
+  targetAudience: string;
+  personas: string;
+  painsAndRemedies: string;
+  designSystem: string;
+  toneOfVoice: string;
+  postsCount: number;
+}) {
+  return `Gere ${input.postsCount} posts para um calendário editorial.
+
+Responda exclusivamente no formato:
+{
+  "posts": [
+    {
+      "title": "título interno",
+      "platform": "instagram" | "linkedin" | "both",
+      "format": "image" | "carousel" | "reel" | "text",
+      "objective": "alcance" | "autoridade" | "leads" | "venda" | "comunidade",
+      "topic": "tema do post",
+      "viral_hook": "hook forte",
+      "angle": "ângulo estratégico",
+      "content": "legenda ou texto completo",
+      "first_comment": "opcional",
+      "hashtags": ["tag1", "tag2"],
+      "pexels_query": "busca visual curta em inglês",
+      "score": 0
+    }
+  ]
+}
+
+Negócio: ${input.businessName}
+Ideia: ${input.businessIdea}
+Proposta de valor: ${input.valueProposition}
+Produto/escopo: ${input.productScope}
+Público-alvo: ${input.targetAudience}
+Personas: ${input.personas}
+Dores e remédio: ${input.painsAndRemedies}
+Design system: ${input.designSystem}
+Tom de voz: ${input.toneOfVoice}
+
+Critérios: hooks específicos, evitar clichês, adaptar Instagram e LinkedIn, não prometer resultado impossível, e sempre deixar pronto para aprovação humana.`;
+}
+
+function buildFallbackPlan(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  postsCount: number;
+}): { posts: GeneratedDraft[] } {
+  const base: GeneratedDraft[] = [
+    {
+      title: "Erro comum que trava o crescimento",
+      platform: "both",
+      format: "image",
+      objective: "alcance",
+      topic: `Erro que o público de ${input.businessName || "negócio"} costuma cometer`,
+      viral_hook: "O problema não é falta de esforço. É falta de direção.",
+      angle: "Contraste entre esforço disperso e clareza estratégica.",
+      content: `O erro mais caro é tentar resolver tudo ao mesmo tempo. Quando a proposta de valor fica clara, o próximo passo também fica. ${input.valueProposition}`,
+      first_comment: "",
+      hashtags: ["estrategia", "negocios", "clareza"],
+      pexels_query: "focused entrepreneur planning",
+      score: 72,
+    },
+    {
+      title: "Antes e depois da clareza",
+      platform: "linkedin",
+      format: "text",
+      objective: "autoridade",
+      topic: "Transformação causada pela proposta de valor",
+      viral_hook: "Antes parecia complexo. Depois ficou óbvio.",
+      angle: "Mostrar transformação sem prometer milagre.",
+      content: `Antes: muitas ideias competindo por atenção. Depois: uma proposta clara, uma dor central e um caminho de execução. Ideia-base: ${input.businessIdea}`,
+      first_comment: "",
+      hashtags: ["posicionamento", "produto", "execucao"],
+      pexels_query: "business clarity whiteboard",
+      score: 76,
+    },
+    {
+      title: "Checklist de decisão",
+      platform: "instagram",
+      format: "carousel",
+      objective: "comunidade",
+      topic: "Checklist prático para o público",
+      viral_hook: "Se você não consegue responder isso, ainda não está pronto para escalar.",
+      angle: "Checklist compartilhável e salvável.",
+      content: "Checklist rápido: 1. Qual dor você resolve? 2. Para quem? 3. Por que agora? 4. Qual primeiro passo? 5. O que deve ser ignorado?",
+      first_comment: "",
+      hashtags: ["checklist", "produtividade", "marketing"],
+      pexels_query: "checklist notebook desk",
+      score: 74,
+    },
+  ];
+
+  return {
+    posts: Array.from({ length: input.postsCount }, (_, index) => ({
+      ...base[index % base.length],
+      title: `${base[index % base.length].title} #${index + 1}`,
+    })),
+  };
+}
+
+function normalizeGeneratedPosts(posts: GeneratedDraft[] | undefined, limit: number) {
+  return (Array.isArray(posts) ? posts : [])
+    .slice(0, limit)
+    .map((post, index) => ({
+      title: String(post.title || `Post gerado #${index + 1}`).slice(0, 180),
+      platform: normalizePlatform(post.platform),
+      format: String(post.format || "image").slice(0, 80),
+      objective: String(post.objective || "alcance").slice(0, 80),
+      topic: String(post.topic || post.title || "Tema editorial").slice(0, 220),
+      viral_hook: String(post.viral_hook || post.title || "").slice(0, 300),
+      angle: String(post.angle || "").slice(0, 500),
+      content: String(post.content || post.viral_hook || post.title || "").slice(
+        0,
+        5000,
+      ),
+      first_comment: post.first_comment
+        ? String(post.first_comment).slice(0, 1000)
+        : "",
+      hashtags: Array.isArray(post.hashtags)
+        ? post.hashtags.slice(0, 12).map((tag) => String(tag).replace(/^#/, ""))
+        : [],
+      pexels_query: post.pexels_query
+        ? String(post.pexels_query).slice(0, 120)
+        : undefined,
+      score:
+        typeof post.score === "number"
+          ? Math.max(0, Math.min(100, Math.round(post.score)))
+          : null,
+    }));
+}
+
+function normalizePlatform(value: unknown): "instagram" | "linkedin" | "both" {
+  return value === "instagram" || value === "linkedin" || value === "both"
+    ? value
+    : "both";
+}
+
+function buildScheduleDate(startDate: string, index: number) {
+  const start = startDate ? new Date(`${startDate}T09:00:00-03:00`) : new Date();
+
+  if (Number.isNaN(start.getTime())) {
+    start.setTime(Date.now());
+  }
+
+  start.setDate(start.getDate() + index * 2);
+  start.setHours(index % 2 === 0 ? 9 : 17, 0, 0, 0);
+
+  return start.toISOString();
 }
 
 export async function recordZernioWebhookEvent(input: {

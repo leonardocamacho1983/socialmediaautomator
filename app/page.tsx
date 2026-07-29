@@ -4,13 +4,21 @@ import {
   CalendarClock,
   Camera,
   CheckCircle2,
+  Sparkles,
   Loader2,
   Send,
   Trash2,
 } from "lucide-react";
-import { logoutAction, createPostAction, updateExistingPostAction } from "@/app/actions";
+import {
+  createPostAction,
+  generateEditorialPlanAction,
+  logoutAction,
+  updateExistingPostAction,
+} from "@/app/actions";
 import { requireAdminPage } from "@/lib/auth";
 import { getEditorialStatus, type EditorialStatus } from "@/lib/editorial-store";
+import { getGroqConfigStatus } from "@/lib/groq";
+import { getPexelsConfigStatus } from "@/lib/pexels";
 import type { SocialAccount, ZernioPost } from "@/lib/types";
 import {
   getReadableZernioError,
@@ -45,6 +53,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
   const zernioConfig = getZernioConfigStatus();
+  const groqConfig = getGroqConfigStatus();
+  const pexelsConfig = getPexelsConfigStatus();
   const [accountsResult, postsResult] = await Promise.all([
     load(listSupportedAccounts()),
     load(listPosts({ limit: 50 })),
@@ -154,8 +164,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     zernioEvents: 0,
                   },
                   recentEvents: [],
+                  recentDrafts: [],
                 }
           }
+          groqReady={groqConfig.hasApiKey}
+          pexelsReady={pexelsConfig.hasApiKey}
         />
 
         <PostsPanel posts={posts} />
@@ -390,7 +403,15 @@ function AccountsPanel({ accounts }: { accounts: SocialAccount[] }) {
   );
 }
 
-function EditorialPanel({ status }: { status: EditorialStatus }) {
+function EditorialPanel({
+  status,
+  groqReady,
+  pexelsReady,
+}: {
+  status: EditorialStatus;
+  groqReady: boolean;
+  pexelsReady: boolean;
+}) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
@@ -404,9 +425,17 @@ function EditorialPanel({ status }: { status: EditorialStatus }) {
             Groq/Pexels entra na próxima camada em cima dessas tabelas.
           </p>
         </div>
-        <StatusPill ok={status.configured}>
-          {status.configured ? "Supabase conectado" : "Supabase pendente"}
-        </StatusPill>
+        <div className="flex flex-wrap gap-2">
+          <StatusPill ok={status.configured}>
+            {status.configured ? "Supabase conectado" : "Supabase pendente"}
+          </StatusPill>
+          <StatusPill ok={groqReady}>
+            {groqReady ? "Groq conectado" : "Groq pendente"}
+          </StatusPill>
+          <StatusPill ok={pexelsReady}>
+            {pexelsReady ? "Pexels conectado" : "Pexels pendente"}
+          </StatusPill>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
@@ -417,6 +446,157 @@ function EditorialPanel({ status }: { status: EditorialStatus }) {
         <MiniMetric label="Drafts" value={status.counts.postDrafts} />
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <h3 className="font-medium text-white">Gerar calendário automático</h3>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Salva o briefing, cria itens de calendário e drafts no Supabase. Não
+          publica nada automaticamente.
+        </p>
+
+        <form action={generateEditorialPlanAction} className="mt-5 grid gap-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Nome do negócio">
+              <input
+                required
+                name="businessName"
+                placeholder="Ex: Aurora, Aplify, consultoria..."
+                className="input"
+              />
+            </Field>
+            <Field label="Início do calendário">
+              <input
+                name="startDate"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <Field label="Ideia do negócio">
+            <textarea
+              required
+              name="businessIdea"
+              rows={3}
+              placeholder="O que é, para quem existe e por que importa."
+              className="input"
+            />
+          </Field>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Proposta de valor">
+              <textarea
+                required
+                name="valueProposition"
+                rows={4}
+                placeholder="Qual transformação você entrega."
+                className="input"
+              />
+            </Field>
+            <Field label="Produto / escopo">
+              <textarea
+                name="productScope"
+                rows={4}
+                placeholder="O que está dentro e fora da oferta."
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Público-alvo">
+              <textarea
+                required
+                name="targetAudience"
+                rows={4}
+                placeholder="Quem queremos atrair."
+                className="input"
+              />
+            </Field>
+            <Field label="Personas">
+              <textarea
+                name="personas"
+                rows={4}
+                placeholder="Perfis, desejos, objeções, linguagem."
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Dores e remédio">
+              <textarea
+                name="painsAndRemedies"
+                rows={4}
+                placeholder="Dores específicas e como o produto resolve."
+                className="input"
+              />
+            </Field>
+            <Field label="Design system / tom visual">
+              <textarea
+                name="designSystem"
+                rows={4}
+                placeholder="Cores, estilo, estética, restrições visuais."
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+            <Field label="Tom de voz">
+              <input
+                name="toneOfVoice"
+                placeholder="Ex: direto, sofisticado, provocativo, humano..."
+                className="input"
+              />
+            </Field>
+            <Field label="Quantidade">
+              <input
+                name="postsCount"
+                type="number"
+                min={1}
+                max={14}
+                defaultValue={6}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+          >
+            <Sparkles className="size-4" />
+            Gerar calendário e drafts
+          </button>
+        </form>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <h3 className="font-medium text-white">Últimos drafts gerados</h3>
+        {status.recentDrafts.length ? (
+          <div className="mt-4 divide-y divide-white/10">
+            {status.recentDrafts.map((draft) => (
+              <div
+                key={draft.id}
+                className="grid gap-2 py-3 text-sm text-zinc-300 lg:grid-cols-[1fr_120px_120px_180px]"
+              >
+                <span className="font-medium text-white">{draft.title}</span>
+                <span>{draft.platform}</span>
+                <PostStatusPill status={draft.status} />
+                <span className="text-zinc-500">
+                  {formatDate(draft.created_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-400">
+            Nenhum draft gerado ainda.
+          </p>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">

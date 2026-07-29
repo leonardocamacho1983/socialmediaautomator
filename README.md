@@ -16,6 +16,9 @@ SUPABASE_URL=https://...
 SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_SUPABASE_URL=https://...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.3-70b-versatile
+PEXELS_API_KEY=...
 ```
 
 Nunca coloque `ZERNIO_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` ou qualquer secret no browser, no prompt ou no GitHub. Variáveis `NEXT_PUBLIC_*` são públicas por definição.
@@ -66,3 +69,14 @@ Todas as tabelas têm RLS habilitado. O app acessa o banco apenas no servidor vi
 Endpoint interno:
 
 - `GET /api/editorial/status`
+
+## Gerador editorial
+
+O dashboard inclui um formulário para gerar calendário e drafts a partir do briefing do negócio.
+
+- Com `GROQ_API_KEY`, o app usa Groq Chat Completions em modo JSON.
+- Sem `GROQ_API_KEY`, o app usa fallback determinístico para validar o fluxo.
+- Com `PEXELS_API_KEY`, o app busca uma mídia sugerida por draft e salva em `media_assets`.
+- Sem `PEXELS_API_KEY`, os drafts são criados sem mídia automática.
+
+Nada é publicado automaticamente. Os drafts ficam no Supabase para revisão humana antes de envio à Zernio.

@@ -4,21 +4,21 @@ import { createClient } from "@supabase/supabase-js";
 
 export function isSupabaseConfigured() {
   return Boolean(
-    process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_URL && getSupabaseSecretKey(),
   );
 }
 
 export function getSupabaseConfigStatus() {
   return {
     hasUrl: Boolean(process.env.SUPABASE_URL),
-    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasServiceRoleKey: Boolean(getSupabaseSecretKey()),
     ready: isSupabaseConfigured(),
   };
 }
 
 export function getSupabaseAdminClient() {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = getSupabaseSecretKey();
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
@@ -32,4 +32,8 @@ export function getSupabaseAdminClient() {
       autoRefreshToken: false,
     },
   });
+}
+
+function getSupabaseSecretKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
 }

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getAdminConfigStatus } from "@/lib/auth";
+import { getGroqConfigStatus } from "@/lib/groq";
+import { getPexelsConfigStatus } from "@/lib/pexels";
 import { getSupabaseConfigStatus } from "@/lib/supabase";
 import { getZernioConfigStatus } from "@/lib/zernio";
 
@@ -9,6 +11,8 @@ export default function SetupPage() {
   const admin = getAdminConfigStatus();
   const zernio = getZernioConfigStatus();
   const supabase = getSupabaseConfigStatus();
+  const groq = getGroqConfigStatus();
+  const pexels = getPexelsConfigStatus();
   const ready = admin.hasAdminPassword && zernio.hasApiKey;
 
   return (
@@ -45,6 +49,16 @@ export default function SetupPage() {
             label="SUPABASE_SERVICE_ROLE_KEY"
             ok={supabase.hasServiceRoleKey}
             description="Chave server-side usada pelo app para persistência."
+          />
+          <StatusCard
+            label="GROQ_API_KEY"
+            ok={groq.hasApiKey}
+            description="Opcional: gera calendário e drafts com IA. Sem ela, o app usa fallback."
+          />
+          <StatusCard
+            label="PEXELS_API_KEY"
+            ok={pexels.hasApiKey}
+            description="Opcional: busca fotos/vídeos sugeridos para os drafts."
           />
         </div>
 

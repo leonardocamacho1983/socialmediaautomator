@@ -8,6 +8,7 @@ import {
   setAdminSession,
   verifyAdminPassword,
 } from "@/lib/auth";
+import { generateEditorialPlan } from "@/lib/editorial-store";
 import { compactErrorForUrl, getFormString, parseCreatePostPayload } from "@/lib/forms";
 import {
   createPost,
@@ -121,4 +122,42 @@ export async function updateExistingPostAction(formData: FormData) {
         ? "Post aprovado e agendado."
         : "Post enviado para publicação.",
   );
+}
+
+export async function generateEditorialPlanAction(formData: FormData) {
+  await requireAdminAction();
+
+  const postsCount = Math.max(
+    1,
+    Math.min(14, Number(getFormString(formData, "postsCount") || 6)),
+  );
+
+  try {
+    const result = await generateEditorialPlan({
+      businessName: getFormString(formData, "businessName"),
+      businessIdea: getFormString(formData, "businessIdea"),
+      valueProposition: getFormString(formData, "valueProposition"),
+      productScope: getFormString(formData, "productScope"),
+      targetAudience: getFormString(formData, "targetAudience"),
+      personas: getFormString(formData, "personas"),
+      painsAndRemedies: getFormString(formData, "painsAndRemedies"),
+      designSystem: getFormString(formData, "designSystem"),
+      toneOfVoice: getFormString(formData, "toneOfVoice"),
+      postsCount,
+      startDate: getFormString(formData, "startDate"),
+    });
+
+    revalidatePath("/");
+    redirectWithResult(
+      "notice",
+      `${result.generated} drafts gerados e salvos no Supabase usando ${result.provider}.`,
+    );
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error
+        ? error.message
+        : "Erro ao gerar calendário editorial.",
+    );
+  }
 }
