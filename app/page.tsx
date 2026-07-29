@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { logoutAction, createPostAction, updateExistingPostAction } from "@/app/actions";
 import { requireAdminPage } from "@/lib/auth";
+import { getEditorialStatus, type EditorialStatus } from "@/lib/editorial-store";
 import type { SocialAccount, ZernioPost } from "@/lib/types";
 import {
   getReadableZernioError,
@@ -48,6 +49,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     load(listSupportedAccounts()),
     load(listPosts({ limit: 50 })),
   ]);
+  const editorialResult = await load(getEditorialStatus());
 
   const accounts = accountsResult.ok ? accountsResult.data.accounts : [];
   const posts = postsResult.ok ? postsResult.data.posts : [];
@@ -117,6 +119,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </Banner>
         ) : null}
 
+        {!editorialResult.ok ? (
+          <Banner tone="error">
+            Não consegui acessar o Supabase: {editorialResult.error}
+          </Banner>
+        ) : null}
+
         <section className="grid gap-4 md:grid-cols-5">
           <StatCard label="Rascunhos" value={stats.draft} />
           <StatCard label="Agendados" value={stats.scheduled} />
@@ -129,6 +137,26 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <CreatePostPanel accounts={accounts} />
           <AccountsPanel accounts={accounts} />
         </section>
+
+        <EditorialPanel
+          status={
+            editorialResult.ok
+              ? editorialResult.data
+              : {
+                  configured: false,
+                  counts: {
+                    brandProfiles: 0,
+                    personas: 0,
+                    contentPillars: 0,
+                    calendarItems: 0,
+                    postDrafts: 0,
+                    mediaAssets: 0,
+                    zernioEvents: 0,
+                  },
+                  recentEvents: [],
+                }
+          }
+        />
 
         <PostsPanel posts={posts} />
       </div>
@@ -359,6 +387,76 @@ function AccountsPanel({ accounts }: { accounts: SocialAccount[] }) {
         />
       )}
     </section>
+  );
+}
+
+function EditorialPanel({ status }: { status: EditorialStatus }) {
+  return (
+    <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
+      <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div>
+          <h2 className="text-xl font-semibold text-white">
+            Motor editorial / Supabase
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+            Fundação pronta para calendário automático, drafts gerados por IA,
+            ativos de mídia e histórico de eventos da Zernio. A geração com
+            Groq/Pexels entra na próxima camada em cima dessas tabelas.
+          </p>
+        </div>
+        <StatusPill ok={status.configured}>
+          {status.configured ? "Supabase conectado" : "Supabase pendente"}
+        </StatusPill>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+        <MiniMetric label="Perfis" value={status.counts.brandProfiles} />
+        <MiniMetric label="Personas" value={status.counts.personas} />
+        <MiniMetric label="Pilares" value={status.counts.contentPillars} />
+        <MiniMetric label="Calendário" value={status.counts.calendarItems} />
+        <MiniMetric label="Drafts" value={status.counts.postDrafts} />
+        <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
+        <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <h3 className="font-medium text-white">Últimos eventos da Zernio</h3>
+        {status.recentEvents.length ? (
+          <div className="mt-4 divide-y divide-white/10">
+            {status.recentEvents.map((event) => (
+              <div
+                key={event.id}
+                className="grid gap-2 py-3 text-sm text-zinc-300 lg:grid-cols-[180px_1fr_180px]"
+              >
+                <span className="font-medium text-white">{event.event_type}</span>
+                <span className="truncate font-mono text-xs text-zinc-500">
+                  {event.zernio_post_id || event.event_id || event.id}
+                </span>
+                <span className="text-zinc-500">
+                  {formatDate(event.received_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-400">
+            Nenhum evento persistido ainda. O botão “Testar webhook” deve gravar
+            o primeiro registro.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+    </div>
   );
 }
 

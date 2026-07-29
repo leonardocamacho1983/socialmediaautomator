@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { recordZernioWebhookEvent } from "@/lib/editorial-store";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,27 @@ export async function POST(request: Request) {
     payload,
   });
 
-  return Response.json({ ok: true });
+  try {
+    const storage = await recordZernioWebhookEvent({ eventId, payload });
+
+    return Response.json({ ok: true, storage });
+  } catch (error) {
+    console.error("zernio.webhook.storage_failed", {
+      eventId,
+      error,
+    });
+
+    return Response.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro ao gravar evento do webhook.",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 function safeEqual(a: string, b: string) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAdminConfigStatus } from "@/lib/auth";
+import { getSupabaseConfigStatus } from "@/lib/supabase";
 import { getZernioConfigStatus } from "@/lib/zernio";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 export default function SetupPage() {
   const admin = getAdminConfigStatus();
   const zernio = getZernioConfigStatus();
+  const supabase = getSupabaseConfigStatus();
   const ready = admin.hasAdminPassword && zernio.hasApiKey;
 
   return (
@@ -34,6 +36,16 @@ export default function SetupPage() {
             ok={admin.hasAdminPassword}
             description="Senha que protege o painel e as rotas internas."
           />
+          <StatusCard
+            label="SUPABASE_URL"
+            ok={supabase.hasUrl}
+            description="URL server-side do projeto Supabase."
+          />
+          <StatusCard
+            label="SUPABASE_SERVICE_ROLE_KEY"
+            ok={supabase.hasServiceRoleKey}
+            description="Chave server-side usada pelo app para persistência."
+          />
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-black/30 p-5">
@@ -43,7 +55,9 @@ export default function SetupPage() {
             <li>Vá em Settings → Environment Variables.</li>
             <li>
               Adicione <code>ZERNIO_API_KEY</code> e{" "}
-              <code>ADMIN_PASSWORD</code>.
+              <code>ADMIN_PASSWORD</code>. Para persistência, mantenha também{" "}
+              <code>SUPABASE_URL</code> e{" "}
+              <code>SUPABASE_SERVICE_ROLE_KEY</code>.
             </li>
             <li>Faça redeploy.</li>
           </ol>
