@@ -8,7 +8,11 @@ import {
   setAdminSession,
   verifyAdminPassword,
 } from "@/lib/auth";
-import { generateEditorialPlan, uploadBrandAsset } from "@/lib/editorial-store";
+import {
+  createBrandReference,
+  generateEditorialPlan,
+  uploadBrandAsset,
+} from "@/lib/editorial-store";
 import { compactErrorForUrl, getFormString, parseCreatePostPayload } from "@/lib/forms";
 import {
   createPost,
@@ -190,6 +194,34 @@ export async function uploadBrandAssetAction(formData: FormData) {
     redirectWithResult(
       "error",
       error instanceof Error ? error.message : "Erro ao subir asset da marca.",
+    );
+  }
+}
+
+export async function createBrandReferenceAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    await createBrandReference({
+      type: getFormString(formData, "type"),
+      title: getFormString(formData, "title"),
+      url: getFormString(formData, "url"),
+      description: getFormString(formData, "description"),
+      tags: getFormString(formData, "tags")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      usageNotes: getFormString(formData, "usageNotes"),
+    });
+
+    revalidatePath("/");
+    redirectWithResult("notice", "Referência da marca salva.");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error
+        ? error.message
+        : "Erro ao salvar referência da marca.",
     );
   }
 }

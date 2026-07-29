@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   AlertTriangle,
   BriefcaseBusiness,
   CalendarClock,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   createPostAction,
+  createBrandReferenceAction,
   generateEditorialPlanAction,
   logoutAction,
   uploadBrandAssetAction,
@@ -164,11 +166,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     postDrafts: 0,
                     mediaAssets: 0,
                     brandAssets: 0,
+                    brandReferences: 0,
                     zernioEvents: 0,
                   },
                   recentEvents: [],
                   recentDrafts: [],
                   recentBrandAssets: [],
+                  recentBrandReferences: [],
                 }
           }
           groqReady={groqConfig.hasApiKey}
@@ -417,16 +421,15 @@ function EditorialPanel({
   pexelsReady: boolean;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
+    <section id="motor-editorial" className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div>
           <h2 className="text-xl font-semibold text-white">
-            Motor editorial / Supabase
+            Motor editorial
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
-            Fundação pronta para calendário automático, drafts gerados por IA,
-            ativos de mídia e histórico de eventos da Zernio. A geração com
-            Groq/Pexels entra na próxima camada em cima dessas tabelas.
+            Fluxo prático: primeiro organize a base da marca, depois gere
+            calendário/drafts, revise e só então publique pela Zernio.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -449,29 +452,56 @@ function EditorialPanel({
         <MiniMetric label="Calendário" value={status.counts.calendarItems} />
         <MiniMetric label="Drafts" value={status.counts.postDrafts} />
         <MiniMetric label="Marca" value={status.counts.brandAssets} />
+        <MiniMetric label="Links" value={status.counts.brandReferences} />
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
-        <h3 className="font-medium text-white">Assets visuais da marca</h3>
+      <div className="mt-6 grid gap-3 md:grid-cols-4">
+        <a href="#base-marca" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+          <p className="text-sm font-semibold text-white">1. Base da marca</p>
+          <p className="mt-1 text-xs text-zinc-500">Arquivos e links.</p>
+        </a>
+        <a href="#gerar-calendario" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+          <p className="text-sm font-semibold text-white">2. Gerar posts</p>
+          <p className="mt-1 text-xs text-zinc-500">Briefing → drafts.</p>
+        </a>
+        <a href="#drafts-gerados" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+          <p className="text-sm font-semibold text-white">3. Revisar</p>
+          <p className="mt-1 text-xs text-zinc-500">Últimos drafts.</p>
+        </a>
+        <a href="#zernio-eventos" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+          <p className="text-sm font-semibold text-white">4. Publicação</p>
+          <p className="mt-1 text-xs text-zinc-500">Eventos Zernio.</p>
+        </a>
+      </div>
+
+      <div id="base-marca" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
+        <h3 className="font-medium text-white">Base da marca</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Suba logos, fotos, screenshots, templates e referências. O bucket é
-          privado no Supabase Storage.
+          Suba arquivos proprietários ou salve links externos como design
+          system, Figma, Canva, site e brand book.
         </p>
 
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
         <form
           action={uploadBrandAssetAction}
-          className="mt-5 grid gap-4"
+          className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
           encType="multipart/form-data"
         >
+          <div>
+            <h4 className="font-medium text-white">Subir arquivo</h4>
+            <p className="mt-1 text-xs text-zinc-500">
+              Aceita imagens, vídeos, PDF e HTML.
+            </p>
+          </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
             <Field label="Arquivo">
               <input
                 required
                 name="file"
                 type="file"
-                accept="image/*,video/mp4,video/quicktime,application/pdf"
+                accept="image/*,video/mp4,video/quicktime,application/pdf,text/html,.html,.htm"
                 className="input"
               />
             </Field>
@@ -534,6 +564,76 @@ function EditorialPanel({
           </button>
         </form>
 
+        <form
+          action={createBrandReferenceAction}
+          className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+        >
+          <div>
+            <h4 className="font-medium text-white">Adicionar link</h4>
+            <p className="mt-1 text-xs text-zinc-500">
+              Melhor opção para design system publicado, Figma, Canva ou site.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+            <Field label="URL">
+              <input
+                required
+                name="url"
+                type="url"
+                placeholder="https://..."
+                className="input"
+              />
+            </Field>
+            <Field label="Tipo">
+              <select name="type" defaultValue="design_system" className="input">
+                <option value="design_system">Design system</option>
+                <option value="brand_book">Brand book</option>
+                <option value="figma">Figma</option>
+                <option value="canva">Canva</option>
+                <option value="landing_page">Landing page</option>
+                <option value="site">Site</option>
+                <option value="reference">Referência</option>
+                <option value="other">Outro</option>
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Título">
+            <input
+              name="title"
+              placeholder="Ex: Design system oficial"
+              className="input"
+            />
+          </Field>
+
+          <Field label="Tags separadas por vírgula">
+            <input
+              name="tags"
+              placeholder="design-system, identidade, componentes"
+              className="input"
+            />
+          </Field>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Descrição">
+              <textarea name="description" rows={3} className="input" />
+            </Field>
+            <Field label="Notas de uso">
+              <textarea name="usageNotes" rows={3} className="input" />
+            </Field>
+          </div>
+
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/20 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+          >
+            <BookOpen className="size-4" />
+            Salvar link de referência
+          </button>
+        </form>
+        </div>
+
         {status.recentBrandAssets.length ? (
           <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {status.recentBrandAssets.map((asset) => (
@@ -563,9 +663,38 @@ function EditorialPanel({
             Nenhum asset proprietário salvo ainda.
           </p>
         )}
+
+        {status.recentBrandReferences.length ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {status.recentBrandReferences.map((reference) => (
+              <a
+                key={reference.id}
+                href={reference.url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4 transition hover:bg-cyan-300/10"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="rounded-full bg-cyan-300/10 px-2.5 py-1 text-xs text-cyan-100">
+                    {reference.type}
+                  </span>
+                  <span className="text-xs text-zinc-600">
+                    {formatDate(reference.created_at)}
+                  </span>
+                </div>
+                <h4 className="line-clamp-2 font-medium text-white">
+                  {reference.title}
+                </h4>
+                <p className="mt-2 truncate text-xs text-zinc-500">
+                  {reference.url}
+                </p>
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div id="gerar-calendario" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Gerar calendário automático</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
           Salva o briefing, cria itens de calendário e drafts no Supabase. Não
@@ -691,7 +820,7 @@ function EditorialPanel({
         </form>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div id="drafts-gerados" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Últimos drafts gerados</h3>
         {status.recentDrafts.length ? (
           <div className="mt-4 divide-y divide-white/10">
@@ -716,7 +845,7 @@ function EditorialPanel({
         )}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div id="zernio-eventos" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Últimos eventos da Zernio</h3>
         {status.recentEvents.length ? (
           <div className="mt-4 divide-y divide-white/10">

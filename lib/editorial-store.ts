@@ -30,6 +30,7 @@ export type EditorialStatus = {
     postDrafts: number;
     mediaAssets: number;
     brandAssets: number;
+    brandReferences: number;
     zernioEvents: number;
   };
   recentEvents: Array<{
@@ -55,6 +56,13 @@ export type EditorialStatus = {
     content_type: string | null;
     created_at: string;
   }>;
+  recentBrandReferences: Array<{
+    id: string;
+    title: string;
+    type: string;
+    url: string;
+    created_at: string;
+  }>;
 };
 
 const EMPTY_STATUS: EditorialStatus = {
@@ -67,11 +75,13 @@ const EMPTY_STATUS: EditorialStatus = {
     postDrafts: 0,
     mediaAssets: 0,
     brandAssets: 0,
+    brandReferences: 0,
     zernioEvents: 0,
   },
   recentEvents: [],
   recentDrafts: [],
   recentBrandAssets: [],
+  recentBrandReferences: [],
 };
 
 const COUNT_TABLES = {
@@ -82,6 +92,7 @@ const COUNT_TABLES = {
   postDrafts: "post_drafts",
   mediaAssets: "media_assets",
   brandAssets: "brand_assets",
+  brandReferences: "brand_references",
   zernioEvents: "zernio_events",
 } as const;
 
@@ -92,7 +103,13 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
 
   const supabase = getSupabaseAdminClient();
 
-  const [counts, recentEvents, recentDrafts, recentBrandAssets] = await Promise.all([
+  const [
+    counts,
+    recentEvents,
+    recentDrafts,
+    recentBrandAssets,
+    recentBrandReferences,
+  ] = await Promise.all([
     Promise.all(
       Object.entries(COUNT_TABLES).map(async ([key, table]) => {
         const { count, error } = await supabase
@@ -121,6 +138,11 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .select("id,title,type,storage_bucket,storage_path,content_type,created_at")
       .order("created_at", { ascending: false })
       .limit(8),
+    supabase
+      .from("brand_references")
+      .select("id,title,type,url,created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   if (recentEvents.error) {
@@ -141,13 +163,65 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  if (recentBrandReferences.error) {
+    throw new Error(
+      `Erro ao listar referências da marca: ${recentBrandReferences.error.message}`,
+    );
+  }
+
   return {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
     recentDrafts: recentDrafts.data ?? [],
     recentBrandAssets: recentBrandAssets.data ?? [],
+    recentBrandReferences: recentBrandReferences.data ?? [],
   };
+}
+
+export async function createBrandReference(input: {
+  type: string;
+  title: string;
+  url: string;
+  description: string;
+  tags: string[];
+  usageNotes: string;
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(input.url);
+  } catch {
+    throw new Error("URL inválida.");
+  }
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Use um link http ou https.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brand_references")
+    .insert({
+      type: normalizeBrandReferenceType(input.type),
+      title: input.title || parsedUrl.hostname,
+      url: parsedUrl.toString(),
+      description: input.description,
+      tags: input.tags,
+      usage_notes: input.usageNotes,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Erro ao salvar referência: ${error.message}`);
+  }
+
+  return data;
 }
 
 export async function uploadBrandAsset(input: {
@@ -213,16 +287,7 @@ export async function uploadBrandAsset(input: {
 async function ensureBrandAssetsBucket() {
   const supabase = getSupabaseAdminClient();
   const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-
-  if (listError) {
-    throw new Error(`Erro ao listar buckets: ${listError.message}`);
-  }
-
-  if (buckets.some((bucket) => bucket.name === "brand-assets")) {
-    return;
-  }
-
-  const { error } = await supabase.storage.createBucket("brand-assets", {
+  const bucketOptions = {
     public: false,
     fileSizeLimit: 50 * 1024 * 1024,
     allowedMimeTypes: [
@@ -234,8 +299,20 @@ async function ensureBrandAssetsBucket() {
       "video/mp4",
       "video/quicktime",
       "application/pdf",
+      "text/html",
     ],
-  });
+  };
+
+  if (listError) {
+    throw new Error(`Erro ao listar buckets: ${listError.message}`);
+  }
+
+  if (buckets.some((bucket) => bucket.name === "brand-assets")) {
+    await supabase.storage.updateBucket("brand-assets", bucketOptions);
+    return;
+  }
+
+  const { error } = await supabase.storage.createBucket("brand-assets", bucketOptions);
 
   if (error) {
     throw new Error(`Erro ao criar bucket brand-assets: ${error.message}`);
@@ -258,8 +335,24 @@ function getSafeExtension(fileName: string, contentType: string) {
   if (contentType === "image/webp") return ".webp";
   if (contentType === "video/mp4") return ".mp4";
   if (contentType === "application/pdf") return ".pdf";
+  if (contentType === "text/html") return ".html";
 
   return "";
+}
+
+function normalizeBrandReferenceType(value: string) {
+  const allowed = new Set([
+    "design_system",
+    "brand_book",
+    "figma",
+    "canva",
+    "landing_page",
+    "site",
+    "reference",
+    "other",
+  ]);
+
+  return allowed.has(value) ? value : "reference";
 }
 
 function normalizeBrandAssetType(value: string) {
