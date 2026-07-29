@@ -17,9 +17,11 @@ import {
   createBrandReferenceAction,
   deleteBrandAssetAction,
   deleteBrandReferenceAction,
+  generateContentIdeasAction,
   generateEditorialPlanAction,
   logoutAction,
   uploadBrandAssetAction,
+  updateContentIdeaStatusAction,
   updateExistingPostAction,
 } from "@/app/actions";
 import { requireAdminPage } from "@/lib/auth";
@@ -171,9 +173,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     brandAssets: 0,
                     brandReferences: 0,
                     brandKnowledge: 0,
+                    contentIdeas: 0,
                     zernioEvents: 0,
                   },
                   recentEvents: [],
+                  recentIdeas: [],
                   recentDrafts: [],
                   recentBrandAssets: [],
                   recentBrandReferences: [],
@@ -432,9 +436,10 @@ function EditorialPanel({
           <h2 className="text-xl font-semibold text-white">
             Motor editorial
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
             Fluxo prático: primeiro organize a base da marca, depois gere
-            calendário/drafts, revise e só então publique pela Zernio.
+            ideias, aprove as melhores, gere drafts, revise e só então publique
+            pela Zernio.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -459,6 +464,7 @@ function EditorialPanel({
         <MiniMetric label="Marca" value={status.counts.brandAssets} />
         <MiniMetric label="Links" value={status.counts.brandReferences} />
         <MiniMetric label="Conhecimento" value={status.counts.brandKnowledge} />
+        <MiniMetric label="Ideias" value={status.counts.contentIdeas} />
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
       </div>
@@ -469,12 +475,12 @@ function EditorialPanel({
           <p className="mt-1 text-xs text-zinc-500">Arquivos e links.</p>
         </a>
         <a href="#gerar-calendario" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
-          <p className="text-sm font-semibold text-white">2. Gerar posts</p>
-          <p className="mt-1 text-xs text-zinc-500">Briefing → drafts.</p>
+          <p className="text-sm font-semibold text-white">2. Gerar ideias</p>
+          <p className="mt-1 text-xs text-zinc-500">Briefing → curadoria.</p>
         </a>
         <a href="#drafts-gerados" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
-          <p className="text-sm font-semibold text-white">3. Revisar</p>
-          <p className="mt-1 text-xs text-zinc-500">Últimos drafts.</p>
+          <p className="text-sm font-semibold text-white">3. Criar posts</p>
+          <p className="mt-1 text-xs text-zinc-500">Drafts e previews.</p>
         </a>
         <a href="#zernio-eventos" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">4. Publicação</p>
@@ -748,11 +754,86 @@ function EditorialPanel({
       </div>
 
       <div id="gerar-calendario" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
-        <h3 className="font-medium text-white">Gerar calendário automático</h3>
+        <h3 className="font-medium text-white">Gerar e escolher ideias</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Salva o briefing, cria itens de calendário e drafts no Supabase. Não
-          publica nada automaticamente.
+          Primeiro gere ideias curtas, aprove as melhores e descarte o resto.
+          Isso evita transformar qualquer coisa em post ruim.
         </p>
+
+        <form action={generateContentIdeasAction} className="mt-5 grid gap-4 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Nome do negócio">
+              <input
+                required
+                name="businessName"
+                placeholder="Ex: Falay"
+                className="input"
+              />
+            </Field>
+            <Field label="Quantidade de ideias">
+              <input
+                name="ideasCount"
+                type="number"
+                min={3}
+                max={30}
+                defaultValue={12}
+                className="input"
+              />
+            </Field>
+          </div>
+          <Field label="Ideia do negócio">
+            <textarea
+              required
+              name="businessIdea"
+              rows={3}
+              placeholder="O que é, para quem existe e por que importa."
+              className="input"
+            />
+          </Field>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Proposta de valor">
+              <textarea
+                required
+                name="valueProposition"
+                rows={3}
+                placeholder="Qual transformação você entrega."
+                className="input"
+              />
+            </Field>
+            <Field label="Público-alvo">
+              <textarea
+                required
+                name="targetAudience"
+                rows={3}
+                placeholder="Quem queremos atrair."
+                className="input"
+              />
+            </Field>
+          </div>
+          <Field label="Tom de voz">
+            <input
+              name="toneOfVoice"
+              placeholder="Ex: direto, sofisticado, provocativo, humano..."
+              className="input"
+            />
+          </Field>
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+          >
+            <Sparkles className="size-4" />
+            Gerar ideias para revisar
+          </button>
+        </form>
+
+        <IdeasReviewPanel ideas={status.recentIdeas} />
+
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <h4 className="font-medium text-white">Opção avançada: gerar drafts direto</h4>
+          <p className="mt-2 text-sm text-zinc-500">
+            Use só para testes. O fluxo recomendado é aprovar ideias antes.
+          </p>
+        </div>
 
         <form action={generateEditorialPlanAction} className="mt-5 grid gap-4">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -1203,6 +1284,126 @@ function DraftPreviewCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function IdeasReviewPanel({
+  ideas,
+}: {
+  ideas: EditorialStatus["recentIdeas"];
+}) {
+  if (!ideas.length) {
+    return (
+      <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-black/20 p-6">
+        <h4 className="font-medium text-white">Nenhuma ideia gerada ainda</h4>
+        <p className="mt-2 text-sm text-zinc-400">
+          Gere ideias primeiro. A intenção é escolher direção criativa antes de
+          pedir drafts completos.
+        </p>
+      </div>
+    );
+  }
+
+  const grouped = {
+    generated: ideas.filter((idea) => idea.status === "generated"),
+    approved: ideas.filter((idea) => idea.status === "approved"),
+    rejected: ideas.filter((idea) => idea.status === "rejected"),
+  };
+
+  return (
+    <div className="mt-6 space-y-5">
+      <div>
+        <h4 className="font-medium text-white">Ideias para curar</h4>
+        <p className="mt-2 text-sm text-zinc-400">
+          Aprove só o que tem um ângulo forte. Ideia fraca não deve virar post.
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[...grouped.generated, ...grouped.approved, ...grouped.rejected].map(
+          (idea) => (
+            <article
+              key={idea.id}
+              className={`rounded-3xl border p-5 ${
+                idea.status === "approved"
+                  ? "border-emerald-400/30 bg-emerald-500/10"
+                  : idea.status === "rejected"
+                    ? "border-red-400/20 bg-red-500/5 opacity-70"
+                    : "border-white/10 bg-white/[0.04]"
+              }`}
+            >
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                    {idea.platform}
+                  </span>
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                    {idea.format}
+                  </span>
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                    score {idea.score ?? "—"}
+                  </span>
+                </div>
+                <PostStatusPill status={idea.status} />
+              </div>
+
+              <h5 className="text-lg font-semibold leading-snug text-white">
+                {idea.hook}
+              </h5>
+              <p className="mt-3 text-sm font-medium text-cyan-100">
+                {idea.topic}
+              </p>
+
+              <div className="mt-4 grid gap-3 text-sm leading-6 text-zinc-300">
+                {idea.pain ? (
+                  <p>
+                    <span className="text-zinc-500">Dor: </span>
+                    {idea.pain}
+                  </p>
+                ) : null}
+                {idea.promise ? (
+                  <p>
+                    <span className="text-zinc-500">Promessa: </span>
+                    {idea.promise}
+                  </p>
+                ) : null}
+                {idea.viral_hypothesis ? (
+                  <p>
+                    <span className="text-zinc-500">Hipótese viral: </span>
+                    {idea.viral_hypothesis}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <form action={updateContentIdeaStatusAction}>
+                  <input type="hidden" name="ideaId" value={idea.id} />
+                  <button
+                    type="submit"
+                    name="intent"
+                    value="approve"
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                  >
+                    Aprovar ideia
+                  </button>
+                </form>
+                <form action={updateContentIdeaStatusAction}>
+                  <input type="hidden" name="ideaId" value={idea.id} />
+                  <button
+                    type="submit"
+                    name="intent"
+                    value="reject"
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                  >
+                    Descartar
+                  </button>
+                </form>
+              </div>
+            </article>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 

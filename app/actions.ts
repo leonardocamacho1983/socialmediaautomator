@@ -13,7 +13,9 @@ import {
   createBrandReference,
   deleteBrandAsset,
   deleteBrandReference,
+  generateContentIdeas,
   generateEditorialPlan,
+  updateContentIdeaStatus,
   uploadBrandAsset,
 } from "@/lib/editorial-store";
 import { compactErrorForUrl, getFormString, parseCreatePostPayload } from "@/lib/forms";
@@ -165,6 +167,67 @@ export async function generateEditorialPlanAction(formData: FormData) {
       error instanceof Error
         ? error.message
         : "Erro ao gerar calendário editorial.",
+    );
+  }
+}
+
+export async function generateContentIdeasAction(formData: FormData) {
+  await requireAdminAction();
+
+  const ideasCount = Math.max(
+    3,
+    Math.min(30, Number(getFormString(formData, "ideasCount") || 12)),
+  );
+
+  try {
+    const result = await generateContentIdeas({
+      businessName: getFormString(formData, "businessName"),
+      businessIdea: getFormString(formData, "businessIdea"),
+      valueProposition: getFormString(formData, "valueProposition"),
+      targetAudience: getFormString(formData, "targetAudience"),
+      toneOfVoice: getFormString(formData, "toneOfVoice"),
+      ideasCount,
+    });
+
+    revalidatePath("/");
+    redirectWithResult(
+      "notice",
+      `${result.generated} ideias geradas usando ${result.provider}. Revise antes de transformar em posts.`,
+    );
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao gerar ideias.",
+    );
+  }
+}
+
+export async function updateContentIdeaStatusAction(formData: FormData) {
+  await requireAdminAction();
+
+  const intent = getFormString(formData, "intent");
+  const status =
+    intent === "approve"
+      ? "approved"
+      : intent === "reject"
+        ? "rejected"
+        : "archived";
+
+  try {
+    await updateContentIdeaStatus({
+      ideaId: getFormString(formData, "ideaId"),
+      status,
+    });
+
+    revalidatePath("/");
+    redirectWithResult(
+      "notice",
+      status === "approved" ? "Ideia aprovada." : "Ideia descartada.",
+    );
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao atualizar ideia.",
     );
   }
 }

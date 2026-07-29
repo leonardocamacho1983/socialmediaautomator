@@ -73,7 +73,10 @@ Endpoint interno:
 
 ## Gerador editorial
 
-O dashboard inclui um formulário para gerar calendário e drafts a partir do briefing do negócio.
+O dashboard agora separa a criação em duas etapas:
+
+1. gerar ideias para curadoria
+2. gerar drafts/previews
 
 - Com `GROQ_API_KEY`, o app usa Groq Chat Completions em modo JSON.
 - Sem `GROQ_API_KEY`, o app usa fallback determinístico para validar o fluxo.
@@ -81,6 +84,8 @@ O dashboard inclui um formulário para gerar calendário e drafts a partir do br
 - Sem `PEXELS_API_KEY`, os drafts são criados sem mídia automática.
 
 Nada é publicado automaticamente. Os drafts ficam no Supabase para revisão humana antes de envio à Zernio.
+
+Ideias ficam em `content_ideas` com status `generated`, `approved`, `rejected`, `expanded` ou `archived`.
 
 ## Assets da marca
 

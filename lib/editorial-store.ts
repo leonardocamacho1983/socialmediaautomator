@@ -21,6 +21,17 @@ export type GeneratedDraft = {
   score?: number;
 };
 
+export type GeneratedIdea = {
+  topic: string;
+  hook: string;
+  pain: string;
+  promise: string;
+  platform: "instagram" | "linkedin" | "both";
+  format: string;
+  viral_hypothesis: string;
+  score?: number;
+};
+
 export type EditorialStatus = {
   configured: boolean;
   counts: {
@@ -33,6 +44,7 @@ export type EditorialStatus = {
     brandAssets: number;
     brandReferences: number;
     brandKnowledge: number;
+    contentIdeas: number;
     zernioEvents: number;
   };
   recentEvents: Array<{
@@ -61,6 +73,19 @@ export type EditorialStatus = {
       source: string;
       author: string | null;
     } | null;
+  }>;
+  recentIdeas: Array<{
+    id: string;
+    topic: string;
+    hook: string;
+    pain: string;
+    promise: string;
+    platform: string;
+    format: string;
+    viral_hypothesis: string;
+    score: number | null;
+    status: string;
+    created_at: string;
   }>;
   recentBrandAssets: Array<{
     id: string;
@@ -135,10 +160,12 @@ const EMPTY_STATUS: EditorialStatus = {
     brandAssets: 0,
     brandReferences: 0,
     brandKnowledge: 0,
+    contentIdeas: 0,
     zernioEvents: 0,
   },
   recentEvents: [],
   recentDrafts: [],
+  recentIdeas: [],
   recentBrandAssets: [],
   recentBrandReferences: [],
   latestBrandKnowledge: null,
@@ -154,6 +181,7 @@ const COUNT_TABLES = {
   brandAssets: "brand_assets",
   brandReferences: "brand_references",
   brandKnowledge: "brand_knowledge",
+  contentIdeas: "content_ideas",
   zernioEvents: "zernio_events",
 } as const;
 
@@ -167,6 +195,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
   const [
     counts,
     recentEvents,
+    recentIdeas,
     recentDrafts,
     recentBrandAssets,
     recentBrandReferences,
@@ -190,6 +219,11 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .select("id,event_id,event_type,zernio_post_id,received_at")
       .order("received_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("content_ideas")
+      .select("id,topic,hook,pain,promise,platform,format,viral_hypothesis,score,status,created_at")
+      .order("created_at", { ascending: false })
+      .limit(12),
     supabase
       .from("post_drafts")
       .select("id,title,content,first_comment,hashtags,platform,status,scheduled_for,media_asset_id,created_at")
@@ -225,6 +259,12 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  if (recentIdeas.error) {
+    throw new Error(
+      `Erro ao listar ideias editoriais: ${recentIdeas.error.message}`,
+    );
+  }
+
   if (recentBrandAssets.error) {
     throw new Error(
       `Erro ao listar assets da marca: ${recentBrandAssets.error.message}`,
@@ -255,6 +295,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
+    recentIdeas: recentIdeas.data ?? [],
     recentDrafts: draftRows.map((draft) => ({
       ...draft,
       hashtags: Array.isArray(draft.hashtags) ? draft.hashtags : [],
@@ -525,6 +566,93 @@ export async function buildBrandKnowledge() {
     references: referenceInventory.length,
     colors: visualIdentity.likely_colors.length,
   };
+}
+
+export async function generateContentIdeas(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  targetAudience: string;
+  toneOfVoice: string;
+  ideasCount: number;
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const latestKnowledge = await getLatestBrandKnowledgeRecord();
+  const brandKnowledge = await getLatestBrandKnowledgePromptContext();
+  const fallback = buildFallbackIdeas(input);
+  const startedAt = Date.now();
+  const generated = await generateJsonWithGroq<{ ideas: GeneratedIdea[] }>({
+    system:
+      "Você é um diretor criativo para Instagram. Gere somente JSON válido. Foque em ideias fortes antes de escrever posts completos.",
+    prompt: buildIdeasPrompt(input, brandKnowledge),
+    fallback,
+  });
+  const ideas = normalizeGeneratedIdeas(generated.data.ideas, input.ideasCount);
+
+  const { error: runError } = await supabase.from("generation_runs").insert({
+    provider: generated.provider,
+    model: generated.model,
+    task: "generate_content_ideas",
+    input,
+    output: { ideas },
+    status: "completed",
+    duration_ms: Date.now() - startedAt,
+  });
+
+  if (runError) {
+    throw new Error(`Erro ao registrar geração de ideias: ${runError.message}`);
+  }
+
+  const { error } = await supabase.from("content_ideas").insert(
+    ideas.map((idea) => ({
+      brand_knowledge_id: latestKnowledge?.id ?? null,
+      topic: idea.topic,
+      hook: idea.hook,
+      pain: idea.pain,
+      promise: idea.promise,
+      platform: idea.platform,
+      format: idea.format,
+      viral_hypothesis: idea.viral_hypothesis,
+      score: idea.score ?? null,
+      status: "generated",
+    })),
+  );
+
+  if (error) {
+    throw new Error(`Erro ao salvar ideias: ${error.message}`);
+  }
+
+  return {
+    provider: generated.provider,
+    generated: ideas.length,
+  };
+}
+
+export async function updateContentIdeaStatus(input: {
+  ideaId: string;
+  status: "approved" | "rejected" | "archived";
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!input.ideaId) {
+    throw new Error("Ideia ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("content_ideas")
+    .update({ status: input.status })
+    .eq("id", input.ideaId);
+
+  if (error) {
+    throw new Error(`Erro ao atualizar ideia: ${error.message}`);
+  }
 }
 
 async function normalizeExistingBrandAssetTypes(
@@ -966,6 +1094,133 @@ async function getLatestBrandKnowledgePromptContext() {
     .filter(Boolean)
     .join("\n\n")
     .slice(0, 12000);
+}
+
+async function getLatestBrandKnowledgeRecord() {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brand_knowledge")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Erro ao carregar conhecimento da marca: ${error.message}`);
+  }
+
+  return data;
+}
+
+function buildIdeasPrompt(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  targetAudience: string;
+  toneOfVoice: string;
+  ideasCount: number;
+}, brandKnowledge: string) {
+  return `Gere ${input.ideasCount} ideias de conteúdo para Instagram, com foco em criatividade, clareza e potencial de compartilhamento.
+
+Responda exclusivamente no formato JSON:
+{
+  "ideas": [
+    {
+      "topic": "tema",
+      "hook": "frase forte de abertura",
+      "pain": "dor específica que a ideia ataca",
+      "promise": "promessa honesta do conteúdo",
+      "platform": "instagram" | "linkedin" | "both",
+      "format": "reel" | "carousel" | "image" | "text",
+      "viral_hypothesis": "por que isso pode performar",
+      "score": 0
+    }
+  ]
+}
+
+Negócio: ${input.businessName}
+Ideia do negócio: ${input.businessIdea}
+Proposta de valor: ${input.valueProposition}
+Público-alvo: ${input.targetAudience}
+Tom de voz: ${input.toneOfVoice}
+
+Conhecimento de marca:
+${brandKnowledge || "Sem conhecimento de marca ingerido."}
+
+Critérios:
+- Não escrever posts completos ainda.
+- Gerar ideias com tensão, contraste, curiosidade ou utilidade prática.
+- Evitar clichês como 'transforme seu negócio' e 'potencialize seus resultados'.
+- Priorizar ideias visuais para Instagram.
+- Cada ideia deve ter uma hipótese clara de viralização.`;
+}
+
+function buildFallbackIdeas(input: {
+  businessName: string;
+  businessIdea: string;
+  valueProposition: string;
+  ideasCount: number;
+}): { ideas: GeneratedIdea[] } {
+  const base: GeneratedIdea[] = [
+    {
+      topic: "Atendimento sem memória",
+      hook: "Seu atendimento não falha por falta de equipe. Falha por falta de memória.",
+      pain: "Clientes esquecidos, follow-up perdido e histórico espalhado.",
+      promise: "Mostrar por que memória operacional melhora atendimento e recompra.",
+      platform: "instagram",
+      format: "carousel",
+      viral_hypothesis:
+        "Frase contraintuitiva + dor reconhecível por donos de negócio.",
+      score: 82,
+    },
+    {
+      topic: "Automação que parece humana",
+      hook: "Automação ruim afasta. Automação com contexto aproxima.",
+      pain: "Medo de parecer robótico no relacionamento com clientes.",
+      promise: `Explicar como ${input.businessName || "a marca"} automatiza sem perder contexto.`,
+      platform: "both",
+      format: "reel",
+      viral_hypothesis:
+        "Quebra objeção comum e abre espaço para demonstração visual.",
+      score: 78,
+    },
+    {
+      topic: "Follow-up invisível",
+      hook: "O dinheiro que você perde geralmente está no follow-up que ninguém fez.",
+      pain: "Leads e clientes esfriam porque ninguém retoma a conversa.",
+      promise: "Mostrar o custo invisível de não acompanhar contatos.",
+      platform: "linkedin",
+      format: "text",
+      viral_hypothesis:
+        "Tema comercial direto, com perda financeira clara e fácil identificação.",
+      score: 80,
+    },
+  ];
+
+  return {
+    ideas: Array.from({ length: input.ideasCount }, (_, index) => ({
+      ...base[index % base.length],
+      topic: `${base[index % base.length].topic} #${index + 1}`,
+    })),
+  };
+}
+
+function normalizeGeneratedIdeas(ideas: GeneratedIdea[] | undefined, limit: number) {
+  return (Array.isArray(ideas) ? ideas : [])
+    .slice(0, limit)
+    .map((idea, index) => ({
+      topic: String(idea.topic || `Ideia #${index + 1}`).slice(0, 220),
+      hook: String(idea.hook || idea.topic || "").slice(0, 300),
+      pain: String(idea.pain || "").slice(0, 500),
+      promise: String(idea.promise || "").slice(0, 500),
+      platform: normalizePlatform(idea.platform),
+      format: String(idea.format || "carousel").slice(0, 80),
+      viral_hypothesis: String(idea.viral_hypothesis || "").slice(0, 700),
+      score:
+        typeof idea.score === "number"
+          ? Math.max(0, Math.min(100, Math.round(idea.score)))
+          : null,
+    }));
 }
 
 function normalizeBrandReferenceType(value: string) {
