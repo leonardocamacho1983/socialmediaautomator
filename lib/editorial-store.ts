@@ -1,6 +1,7 @@
 import "server-only";
 
 import crypto from "node:crypto";
+import JSZip from "jszip";
 import { generateJsonWithGroq } from "@/lib/groq";
 import { searchPexelsAsset, type PexelsAsset } from "@/lib/pexels";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -68,6 +69,13 @@ export type EditorialStatus = {
 export type BrandAssetSummary = EditorialStatus["recentBrandAssets"][number];
 export type BrandReferenceSummary =
   EditorialStatus["recentBrandReferences"][number];
+export type BrandAssetUploadResult = {
+  id: string;
+  extractedCount: number;
+  skippedCount: number;
+  isZipImport: boolean;
+  batchId?: string;
+};
 
 const EMPTY_STATUS: EditorialStatus = {
   configured: false,
@@ -225,7 +233,12 @@ export async function createBrandReference(input: {
     throw new Error(`Erro ao salvar referência: ${error.message}`);
   }
 
-  return data;
+  return {
+    id: data.id,
+    extractedCount: 1,
+    skippedCount: 0,
+    isZipImport: false,
+  };
 }
 
 export async function deleteBrandAsset(assetId: string) {
@@ -295,7 +308,7 @@ export async function uploadBrandAsset(input: {
   description: string;
   tags: string[];
   usageNotes: string;
-}) {
+}): Promise<BrandAssetUploadResult> {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase não está configurado.");
   }
@@ -306,6 +319,10 @@ export async function uploadBrandAsset(input: {
 
   if (input.file.size > 50 * 1024 * 1024) {
     throw new Error("Arquivo acima de 50MB.");
+  }
+
+  if (isZipFile(input.file)) {
+    return uploadBrandAssetZip(input);
   }
 
   const supabase = getSupabaseAdminClient();
@@ -345,7 +362,114 @@ export async function uploadBrandAsset(input: {
     throw new Error(`Erro ao salvar asset: ${error.message}`);
   }
 
-  return data;
+  return {
+    id: data.id,
+    extractedCount: 1,
+    skippedCount: 0,
+    isZipImport: false,
+  };
+}
+
+async function uploadBrandAssetZip(input: {
+  file: File;
+  type: string;
+  title: string;
+  description: string;
+  tags: string[];
+  usageNotes: string;
+}): Promise<BrandAssetUploadResult> {
+  const zip = await JSZip.loadAsync(await input.file.arrayBuffer());
+  const entries = Object.values(zip.files).filter((entry) => {
+    return !entry.dir && isUsableZipEntry(entry.name);
+  });
+
+  if (!entries.length) {
+    throw new Error("ZIP não contém arquivos utilizáveis.");
+  }
+
+  if (entries.length > 100) {
+    throw new Error("ZIP com arquivos demais. Limite: 100 arquivos.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  await ensureBrandAssetsBucket();
+
+  const batchId = crypto.randomUUID();
+  const savedAssetIds: string[] = [];
+  let skipped = 0;
+
+  for (const entry of entries) {
+    const contentType = inferContentTypeFromPath(entry.name);
+
+    if (!contentType) {
+      skipped += 1;
+      continue;
+    }
+
+    const bytes = await entry.async("uint8array");
+
+    if (!bytes.byteLength || bytes.byteLength > 50 * 1024 * 1024) {
+      skipped += 1;
+      continue;
+    }
+
+    const extension = getSafeExtension(entry.name, contentType);
+    const cleanName = getCleanFileName(entry.name);
+    const storagePath = `${new Date().toISOString().slice(0, 10)}/${batchId}/${cryptoRandomId()}${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from("brand-assets")
+      .upload(storagePath, Buffer.from(bytes), {
+        contentType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`Erro ao subir ${cleanName}: ${uploadError.message}`);
+    }
+
+    const { data, error } = await supabase
+      .from("brand_assets")
+      .insert({
+        type: inferBrandAssetType(cleanName, contentType, input.type),
+        title: input.title ? `${input.title} / ${cleanName}` : cleanName,
+        description: input.description,
+        storage_bucket: "brand-assets",
+        storage_path: storagePath,
+        content_type: contentType,
+        size_bytes: bytes.byteLength,
+        tags: [...input.tags, "zip-import"].filter(Boolean),
+        usage_notes: [
+          input.usageNotes,
+          `Extraído do ZIP: ${input.file.name}`,
+          `Lote: ${batchId}`,
+          `Caminho original: ${entry.name}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao salvar ${cleanName}: ${error.message}`);
+    }
+
+    savedAssetIds.push(data.id);
+  }
+
+  if (!savedAssetIds.length) {
+    throw new Error(
+      "Nenhum arquivo interno do ZIP tinha formato aceito. Use imagens, vídeos, PDF ou HTML.",
+    );
+  }
+
+  return {
+    id: savedAssetIds[0],
+    extractedCount: savedAssetIds.length,
+    skippedCount: skipped,
+    batchId,
+    isZipImport: true,
+  };
 }
 
 async function ensureBrandAssetsBucket() {
@@ -406,6 +530,68 @@ function getSafeExtension(fileName: string, contentType: string) {
   if (contentType === "application/x-zip-compressed") return ".zip";
 
   return "";
+}
+
+function isZipFile(file: File) {
+  const name = file.name.toLowerCase();
+
+  return (
+    name.endsWith(".zip") ||
+    file.type === "application/zip" ||
+    file.type === "application/x-zip-compressed"
+  );
+}
+
+function isUsableZipEntry(path: string) {
+  const normalized = path.replaceAll("\\", "/");
+  const fileName = normalized.split("/").pop() ?? "";
+
+  if (!fileName || fileName.startsWith(".") || normalized.includes("__MACOSX/")) {
+    return false;
+  }
+
+  if (normalized.includes("../") || normalized.startsWith("/")) {
+    return false;
+  }
+
+  return Boolean(inferContentTypeFromPath(path));
+}
+
+function inferContentTypeFromPath(path: string) {
+  const lower = path.toLowerCase().split("?")[0] ?? "";
+
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
+
+  return null;
+}
+
+function getCleanFileName(path: string) {
+  return path.replaceAll("\\", "/").split("/").pop() || "asset";
+}
+
+function inferBrandAssetType(fileName: string, contentType: string, fallback: string) {
+  const lower = fileName.toLowerCase();
+
+  if (lower.includes("logo")) return "logo";
+  if (lower.includes("template")) return "template";
+  if (lower.includes("screenshot") || lower.includes("screen")) return "screenshot";
+  if (lower.includes("background") || lower.includes("bg")) return "background";
+  if (contentType === "text/html" || contentType === "application/pdf") {
+    return "reference";
+  }
+  if (contentType.startsWith("image/")) {
+    return normalizeBrandAssetType(fallback === "other" ? "photo" : fallback);
+  }
+
+  return normalizeBrandAssetType(fallback);
 }
 
 function normalizeBrandReferenceType(value: string) {

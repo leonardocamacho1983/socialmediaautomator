@@ -494,7 +494,8 @@ function EditorialPanel({
           <div>
             <h4 className="font-medium text-white">Subir arquivo</h4>
             <p className="mt-1 text-xs text-zinc-500">
-              Aceita imagens, vídeos, PDF, HTML e ZIP.
+              Aceita imagens, vídeos, PDF e HTML. ZIP é descompactado e cada
+              arquivo interno vira um asset separado.
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_180px]">

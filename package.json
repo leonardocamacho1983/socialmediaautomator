@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.111.0",
     "@tailwindcss/postcss": "latest",
     "clsx": "latest",
+    "jszip": "^3.10.1",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

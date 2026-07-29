@@ -178,7 +178,7 @@ export async function uploadBrandAssetAction(formData: FormData) {
   }
 
   try {
-    await uploadBrandAsset({
+    const result = await uploadBrandAsset({
       file,
       type: getFormString(formData, "type"),
       title: getFormString(formData, "title") || file.name,
@@ -191,7 +191,12 @@ export async function uploadBrandAssetAction(formData: FormData) {
     });
 
     revalidatePath("/");
-    redirectWithResult("notice", "Asset da marca salvo.");
+    redirectWithResult(
+      "notice",
+      result.isZipImport
+        ? `${result.extractedCount} arquivos extraídos do ZIP e salvos como assets.${result.skippedCount ? ` ${result.skippedCount} ignorados por formato/tamanho.` : ""}`
+        : "Asset da marca salvo.",
+    );
   } catch (error) {
     redirectWithResult(
       "error",

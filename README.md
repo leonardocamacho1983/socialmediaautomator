@@ -98,6 +98,13 @@ Os metadados ficam em `brand_assets`; os arquivos ficam no bucket privado `brand
 
 Arquivos HTML do design system também são aceitos no upload (`.html`/`.htm`), assim como pacotes `.zip`.
 
+Ao subir um `.zip`, o app descompacta o pacote e salva cada arquivo interno aceito como um asset separado. Limites:
+
+- até 50MB por upload
+- até 100 arquivos úteis dentro do ZIP
+- aceita imagens, vídeos, PDF e HTML
+- ignora arquivos de sistema, caminhos inseguros e formatos desconhecidos
+
 Para design systems publicados como URL, use o formulário "Adicionar link":
 
 - design system
