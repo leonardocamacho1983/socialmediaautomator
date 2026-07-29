@@ -874,21 +874,22 @@ function EditorialPanel({
       </div>
 
       <div id="drafts-gerados" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
-        <h3 className="font-medium text-white">Últimos drafts gerados</h3>
+        <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+          <div>
+            <h3 className="font-medium text-white">Previews dos drafts</h3>
+            <p className="mt-2 text-sm text-zinc-400">
+              Visualização editorial do que foi gerado. Ainda não publica nada
+              automaticamente.
+            </p>
+          </div>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-zinc-300">
+            {status.recentDrafts.length} recentes
+          </span>
+        </div>
         {status.recentDrafts.length ? (
-          <div className="mt-4 divide-y divide-white/10">
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {status.recentDrafts.map((draft) => (
-              <div
-                key={draft.id}
-                className="grid gap-2 py-3 text-sm text-zinc-300 lg:grid-cols-[1fr_120px_120px_180px]"
-              >
-                <span className="font-medium text-white">{draft.title}</span>
-                <span>{draft.platform}</span>
-                <PostStatusPill status={draft.status} />
-                <span className="text-zinc-500">
-                  {formatDate(draft.created_at)}
-                </span>
-              </div>
+              <DraftPreviewCard key={draft.id} draft={draft} />
             ))}
           </div>
         ) : (
@@ -1080,6 +1081,128 @@ function AssetLine({
         {asset.content_type || asset.type}
       </p>
     </div>
+  );
+}
+
+function DraftPreviewCard({
+  draft,
+}: {
+  draft: EditorialStatus["recentDrafts"][number];
+}) {
+  const hashtags = draft.hashtags?.filter(Boolean) ?? [];
+  const isInstagram = draft.platform === "instagram";
+  const isLinkedIn = draft.platform === "linkedin";
+  const platformLabel =
+    draft.platform === "both"
+      ? "Instagram + LinkedIn"
+      : isInstagram
+        ? "Instagram"
+        : isLinkedIn
+          ? "LinkedIn"
+          : draft.platform;
+  const media = draft.media_asset;
+
+  return (
+    <article className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/80">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">
+            {platformLabel}
+          </p>
+          <p className="text-xs text-zinc-500">
+            Criado em {formatDate(draft.created_at)}
+          </p>
+        </div>
+        <PostStatusPill status={draft.status} />
+      </div>
+
+      {media ? (
+        <div className="border-b border-white/10 bg-black">
+          {media.media_type === "video" ? (
+            <div className="flex aspect-video items-center justify-center bg-white/[0.04] text-sm text-zinc-400">
+              Vídeo sugerido: {media.source}
+            </div>
+          ) : (
+            <div
+              className="aspect-[4/3] bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${media.thumbnail_url || media.url})`,
+              }}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="flex aspect-[4/3] items-center justify-center border-b border-white/10 bg-gradient-to-br from-cyan-950/50 via-zinc-900 to-orange-950/40 px-6 text-center">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-cyan-100/60">
+              Preview sem mídia
+            </p>
+            <p className="mt-3 text-xl font-semibold text-white">
+              {draft.title}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4 p-4">
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h4 className="text-base font-semibold text-white">
+              {draft.title}
+            </h4>
+            {draft.scheduled_for ? (
+              <span className="rounded-full bg-cyan-300/10 px-2.5 py-1 text-xs text-cyan-100">
+                sugerido: {formatDate(draft.scheduled_for)}
+              </span>
+            ) : null}
+          </div>
+          <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-300">
+            {draft.content}
+          </p>
+        </div>
+
+        {hashtags.length ? (
+          <div className="flex flex-wrap gap-2">
+            {hashtags.slice(0, 12).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-cyan-100"
+              >
+                #{tag.replace(/^#/, "")}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {draft.first_comment ? (
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+              Primeiro comentário
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-300">
+              {draft.first_comment}
+            </p>
+          </div>
+        ) : null}
+
+        {media ? (
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+              Mídia sugerida
+            </p>
+            <a
+              href={media.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block truncate text-sm text-cyan-200 hover:underline"
+            >
+              {media.source}
+              {media.author ? ` / ${media.author}` : ""}
+            </a>
+          </div>
+        ) : null}
+      </div>
+    </article>
   );
 }
 

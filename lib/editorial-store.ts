@@ -45,9 +45,22 @@ export type EditorialStatus = {
   recentDrafts: Array<{
     id: string;
     title: string;
+    content: string;
+    first_comment: string;
+    hashtags: string[];
     platform: string;
     status: string;
+    scheduled_for: string | null;
+    media_asset_id: string | null;
     created_at: string;
+    media_asset?: {
+      id: string;
+      url: string;
+      thumbnail_url: string | null;
+      media_type: string;
+      source: string;
+      author: string | null;
+    } | null;
   }>;
   recentBrandAssets: Array<{
     id: string;
@@ -179,7 +192,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .limit(5),
     supabase
       .from("post_drafts")
-      .select("id,title,platform,status,created_at")
+      .select("id,title,content,first_comment,hashtags,platform,status,scheduled_for,media_asset_id,created_at")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
@@ -230,11 +243,25 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  const draftRows = recentDrafts.data ?? [];
+  const mediaAssetIds = draftRows
+    .map((draft) => draft.media_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const mediaAssetsById = mediaAssetIds.length
+    ? await getMediaAssetsById(mediaAssetIds)
+    : new Map();
+
   return {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
-    recentDrafts: recentDrafts.data ?? [],
+    recentDrafts: draftRows.map((draft) => ({
+      ...draft,
+      hashtags: Array.isArray(draft.hashtags) ? draft.hashtags : [],
+      media_asset: draft.media_asset_id
+        ? mediaAssetsById.get(draft.media_asset_id) ?? null
+        : null,
+    })),
     recentBrandAssets: recentBrandAssets.data ?? [],
     recentBrandReferences: recentBrandReferences.data ?? [],
     latestBrandKnowledge: latestBrandKnowledge.data
@@ -308,6 +335,20 @@ export async function createBrandReference(input: {
     skippedCount: 0,
     isZipImport: false,
   };
+}
+
+async function getMediaAssetsById(ids: string[]) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("media_assets")
+    .select("id,url,thumbnail_url,media_type,source,author")
+    .in("id", [...new Set(ids)]);
+
+  if (error) {
+    throw new Error(`Erro ao carregar mídias dos drafts: ${error.message}`);
+  }
+
+  return new Map((data ?? []).map((asset) => [asset.id, asset]));
 }
 
 export async function deleteBrandAsset(assetId: string) {
