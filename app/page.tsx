@@ -71,12 +71,22 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             </p>
           </div>
           <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
-            >
-              Sair
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="/api/webhooks/zernio/self-test"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-cyan-300/20 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+              >
+                Testar webhook
+              </a>
+              <button
+                type="submit"
+                className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+              >
+                Sair
+              </button>
+            </div>
           </form>
         </header>
 
