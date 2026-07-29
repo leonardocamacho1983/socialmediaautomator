@@ -69,6 +69,19 @@ export type EditorialStatus = {
     id: string;
     summary: string;
     visual_identity: Record<string, unknown>;
+    asset_inventory: Array<{
+      title: string;
+      type: string;
+      content_type: string | null;
+      storage_path: string;
+      tags: string[];
+    }>;
+    reference_inventory: Array<{
+      title: string;
+      type: string;
+      url: string;
+      tags: string[];
+    }>;
     created_at: string;
   } | null;
 };
@@ -76,6 +89,19 @@ export type EditorialStatus = {
 export type BrandAssetSummary = EditorialStatus["recentBrandAssets"][number];
 export type BrandReferenceSummary =
   EditorialStatus["recentBrandReferences"][number];
+export type BrandKnowledgeAssetInventory = {
+  title: string;
+  type: string;
+  content_type: string | null;
+  storage_path: string;
+  tags: string[];
+};
+export type BrandKnowledgeReferenceInventory = {
+  title: string;
+  type: string;
+  url: string;
+  tags: string[];
+};
 export type BrandAssetUploadResult = {
   id: string;
   extractedCount: number;
@@ -168,7 +194,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .limit(8),
     supabase
       .from("brand_knowledge")
-      .select("id,summary,visual_identity,created_at")
+      .select("id,summary,visual_identity,asset_inventory,reference_inventory,created_at")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -219,6 +245,16 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
             typeof latestBrandKnowledge.data.visual_identity === "object"
               ? (latestBrandKnowledge.data.visual_identity as Record<string, unknown>)
               : {},
+          asset_inventory: Array.isArray(
+            latestBrandKnowledge.data.asset_inventory,
+          )
+            ? (latestBrandKnowledge.data.asset_inventory as BrandKnowledgeAssetInventory[])
+            : [],
+          reference_inventory: Array.isArray(
+            latestBrandKnowledge.data.reference_inventory,
+          )
+            ? (latestBrandKnowledge.data.reference_inventory as BrandKnowledgeReferenceInventory[])
+            : [],
         }
       : null,
   };

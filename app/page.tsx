@@ -177,7 +177,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   recentDrafts: [],
                   recentBrandAssets: [],
                   recentBrandReferences: [],
-                  latestBrandKnowledge: null,
+  latestBrandKnowledge: null,
                 }
           }
           groqReady={groqConfig.hasApiKey}
@@ -499,15 +499,7 @@ function EditorialPanel({
                 Analisa HTML/SVG, inventaria assets e cria um resumo usado pelo
                 gerador de posts. Rode novamente depois de subir novos arquivos.
               </p>
-              {status.latestBrandKnowledge ? (
-                <p className="mt-3 line-clamp-3 text-sm text-cyan-100">
-                  {status.latestBrandKnowledge.summary}
-                </p>
-              ) : (
-                <p className="mt-3 text-sm text-amber-100">
-                  Ainda não há conhecimento de marca ingerido.
-                </p>
-              )}
+              <BrandKnowledgeOverview knowledge={status.latestBrandKnowledge} />
             </div>
             <form action={buildBrandKnowledgeAction}>
               <button
@@ -943,6 +935,150 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
         {label}
       </p>
       <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function BrandKnowledgeOverview({
+  knowledge,
+}: {
+  knowledge: EditorialStatus["latestBrandKnowledge"];
+}) {
+  if (!knowledge) {
+    return (
+      <p className="mt-3 text-sm text-amber-100">
+        Ainda não há conhecimento de marca ingerido.
+      </p>
+    );
+  }
+
+  const assets = knowledge.asset_inventory ?? [];
+  const logos = assets.filter((asset) => asset.type === "logo");
+  const references = assets.filter((asset) => asset.type === "reference");
+  const templates = assets.filter((asset) => asset.type === "template");
+  const visualIdentity = knowledge.visual_identity ?? {};
+  const likelyColors = Array.isArray(visualIdentity.likely_colors)
+    ? (visualIdentity.likely_colors as Array<{ color?: string; count?: number }>)
+    : [];
+  const htmlExcerpt =
+    typeof visualIdentity.html_excerpt === "string"
+      ? visualIdentity.html_excerpt
+      : "";
+
+  return (
+    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <KnowledgeCard title="Logos" empty="Nenhum logo identificado.">
+        {logos.slice(0, 6).map((asset) => (
+          <AssetLine key={asset.storage_path} asset={asset} />
+        ))}
+      </KnowledgeCard>
+
+      <KnowledgeCard
+        title="Símbolos e referências"
+        empty="Nenhum símbolo/referência identificado."
+      >
+        {references.slice(0, 8).map((asset) => (
+          <AssetLine key={asset.storage_path} asset={asset} />
+        ))}
+      </KnowledgeCard>
+
+      <KnowledgeCard title="Cores detectadas" empty="Nenhuma cor detectada.">
+        <div className="flex flex-wrap gap-2">
+          {likelyColors.slice(0, 12).map((item) =>
+            item.color ? (
+              <span
+                key={item.color}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs text-zinc-200"
+              >
+                <span
+                  className="size-3 rounded-full border border-white/20"
+                  style={{ backgroundColor: item.color }}
+                />
+                {item.color}
+              </span>
+            ) : null,
+          )}
+        </div>
+      </KnowledgeCard>
+
+      <KnowledgeCard title="Design system HTML" empty="Nenhum HTML analisado.">
+        {htmlExcerpt ? (
+          <p className="line-clamp-6 text-xs leading-5 text-zinc-400">
+            {htmlExcerpt}
+          </p>
+        ) : null}
+      </KnowledgeCard>
+
+      {templates.length ? (
+        <KnowledgeCard title="Templates" empty="">
+          {templates.slice(0, 6).map((asset) => (
+            <AssetLine key={asset.storage_path} asset={asset} />
+          ))}
+        </KnowledgeCard>
+      ) : null}
+
+      {knowledge.reference_inventory.length ? (
+        <KnowledgeCard title="Links externos" empty="">
+          {knowledge.reference_inventory.slice(0, 6).map((reference) => (
+            <a
+              key={reference.url}
+              href={reference.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block truncate text-xs text-cyan-200 hover:underline"
+            >
+              {reference.title}
+            </a>
+          ))}
+        </KnowledgeCard>
+      ) : null}
+    </div>
+  );
+}
+
+function KnowledgeCard({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: string;
+  children: React.ReactNode;
+}) {
+  const hasChildren = Array.isArray(children)
+    ? children.some(Boolean)
+    : Boolean(children);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+      <h5 className="text-sm font-semibold text-white">{title}</h5>
+      <div className="mt-3 space-y-2">
+        {hasChildren ? (
+          children
+        ) : (
+          <p className="text-xs text-zinc-500">{empty}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AssetLine({
+  asset,
+}: {
+  asset: {
+    title: string;
+    type: string;
+    content_type: string | null;
+    storage_path: string;
+  };
+}) {
+  return (
+    <div className="min-w-0 rounded-xl bg-white/[0.04] px-3 py-2">
+      <p className="truncate text-xs font-medium text-zinc-100">{asset.title}</p>
+      <p className="mt-1 truncate text-[11px] text-zinc-600">
+        {asset.content_type || asset.type}
+      </p>
     </div>
   );
 }
