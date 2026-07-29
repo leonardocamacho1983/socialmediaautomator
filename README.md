@@ -118,3 +118,19 @@ Para design systems publicados como URL, use o formulário "Adicionar link":
 Esses links ficam em `brand_references`.
 
 Assets e referências podem ser deletados pelo dashboard. No caso de asset enviado, o app remove o arquivo do Supabase Storage e depois remove o registro em `brand_assets`.
+
+## Conhecimento da marca
+
+Depois de subir assets ou links, use o botão "Analisar marca" no dashboard.
+
+Essa análise:
+
+- lê inventário de `brand_assets` e `brand_references`
+- baixa HTML/SVG do bucket privado quando possível
+- extrai texto útil de HTML
+- extrai cores prováveis de HTML/SVG
+- reclassifica assets por nome quando detecta logo, símbolo, favicon, avatar, template etc.
+- salva um resumo em `brand_knowledge`
+- injeta esse resumo no prompt do gerador editorial
+
+Sem essa etapa, o gerador usa apenas o campo manual "Design system / tom visual".

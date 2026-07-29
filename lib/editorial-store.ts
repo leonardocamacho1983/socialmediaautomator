@@ -32,6 +32,7 @@ export type EditorialStatus = {
     mediaAssets: number;
     brandAssets: number;
     brandReferences: number;
+    brandKnowledge: number;
     zernioEvents: number;
   };
   recentEvents: Array<{
@@ -64,6 +65,12 @@ export type EditorialStatus = {
     url: string;
     created_at: string;
   }>;
+  latestBrandKnowledge: {
+    id: string;
+    summary: string;
+    visual_identity: Record<string, unknown>;
+    created_at: string;
+  } | null;
 };
 
 export type BrandAssetSummary = EditorialStatus["recentBrandAssets"][number];
@@ -88,12 +95,14 @@ const EMPTY_STATUS: EditorialStatus = {
     mediaAssets: 0,
     brandAssets: 0,
     brandReferences: 0,
+    brandKnowledge: 0,
     zernioEvents: 0,
   },
   recentEvents: [],
   recentDrafts: [],
   recentBrandAssets: [],
   recentBrandReferences: [],
+  latestBrandKnowledge: null,
 };
 
 const COUNT_TABLES = {
@@ -105,6 +114,7 @@ const COUNT_TABLES = {
   mediaAssets: "media_assets",
   brandAssets: "brand_assets",
   brandReferences: "brand_references",
+  brandKnowledge: "brand_knowledge",
   zernioEvents: "zernio_events",
 } as const;
 
@@ -121,6 +131,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     recentDrafts,
     recentBrandAssets,
     recentBrandReferences,
+    latestBrandKnowledge,
   ] = await Promise.all([
     Promise.all(
       Object.entries(COUNT_TABLES).map(async ([key, table]) => {
@@ -155,6 +166,12 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .select("id,title,type,url,created_at")
       .order("created_at", { ascending: false })
       .limit(8),
+    supabase
+      .from("brand_knowledge")
+      .select("id,summary,visual_identity,created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (recentEvents.error) {
@@ -181,6 +198,12 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  if (latestBrandKnowledge.error) {
+    throw new Error(
+      `Erro ao carregar conhecimento da marca: ${latestBrandKnowledge.error.message}`,
+    );
+  }
+
   return {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
@@ -188,6 +211,16 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     recentDrafts: recentDrafts.data ?? [],
     recentBrandAssets: recentBrandAssets.data ?? [],
     recentBrandReferences: recentBrandReferences.data ?? [],
+    latestBrandKnowledge: latestBrandKnowledge.data
+      ? {
+          ...latestBrandKnowledge.data,
+          visual_identity:
+            latestBrandKnowledge.data.visual_identity &&
+            typeof latestBrandKnowledge.data.visual_identity === "object"
+              ? (latestBrandKnowledge.data.visual_identity as Record<string, unknown>)
+              : {},
+        }
+      : null,
   };
 }
 
@@ -298,6 +331,138 @@ export async function deleteBrandReference(referenceId: string) {
 
   if (error) {
     throw new Error(`Erro ao deletar referência: ${error.message}`);
+  }
+}
+
+export async function buildBrandKnowledge() {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const [assetsResult, referencesResult] = await Promise.all([
+    supabase
+      .from("brand_assets")
+      .select("id,title,type,storage_bucket,storage_path,content_type,tags,usage_notes,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("brand_references")
+      .select("id,title,type,url,tags,usage_notes,created_at")
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  if (assetsResult.error) {
+    throw new Error(`Erro ao listar assets: ${assetsResult.error.message}`);
+  }
+
+  if (referencesResult.error) {
+    throw new Error(
+      `Erro ao listar referências: ${referencesResult.error.message}`,
+    );
+  }
+
+  const assets = assetsResult.data ?? [];
+  const references = referencesResult.data ?? [];
+  const htmlTexts: string[] = [];
+  const svgTexts: string[] = [];
+
+  for (const asset of assets.slice(0, 60)) {
+    if (
+      asset.content_type !== "text/html" &&
+      asset.content_type !== "image/svg+xml"
+    ) {
+      continue;
+    }
+
+    const { data, error } = await supabase.storage
+      .from(asset.storage_bucket)
+      .download(asset.storage_path);
+
+    if (error || !data) {
+      continue;
+    }
+
+    const text = await data.text();
+
+    if (asset.content_type === "text/html") {
+      htmlTexts.push(stripHtml(text).slice(0, 8000));
+    } else {
+      svgTexts.push(text.slice(0, 4000));
+    }
+  }
+
+  const assetInventory = assets.map((asset) => ({
+    id: asset.id,
+    title: asset.title,
+    type: classifyAssetFromName(asset.title, asset.type),
+    content_type: asset.content_type,
+    storage_path: asset.storage_path,
+    tags: asset.tags ?? [],
+    usage_notes: asset.usage_notes,
+  }));
+  const referenceInventory = references.map((reference) => ({
+    id: reference.id,
+    title: reference.title,
+    type: reference.type,
+    url: reference.url,
+    tags: reference.tags ?? [],
+    usage_notes: reference.usage_notes,
+  }));
+  const visualIdentity = {
+    asset_counts: countBy(assetInventory, "type"),
+    content_types: countBy(assetInventory, "content_type"),
+    names: assetInventory.map((asset) => asset.title),
+    likely_colors: extractLikelyColors([...htmlTexts, ...svgTexts].join("\n")),
+    html_excerpt: htmlTexts.join("\n\n").slice(0, 12000),
+  };
+  const summary = buildBrandKnowledgeSummary({
+    assetInventory,
+    referenceInventory,
+    visualIdentity,
+  });
+
+  const { data, error } = await supabase
+    .from("brand_knowledge")
+    .insert({
+      source: "brand_assets",
+      summary,
+      visual_identity: visualIdentity,
+      asset_inventory: assetInventory,
+      reference_inventory: referenceInventory,
+      generated_by: "system",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Erro ao salvar conhecimento da marca: ${error.message}`);
+  }
+
+  await normalizeExistingBrandAssetTypes(assetInventory);
+
+  return {
+    id: data.id,
+    assets: assetInventory.length,
+    references: referenceInventory.length,
+    colors: visualIdentity.likely_colors.length,
+  };
+}
+
+async function normalizeExistingBrandAssetTypes(
+  inventory: Array<{ id: string; title: string; type: string }>,
+) {
+  const supabase = getSupabaseAdminClient();
+
+  for (const asset of inventory) {
+    const nextType = classifyAssetFromName(asset.title, asset.type);
+
+    if (nextType === asset.type) {
+      continue;
+    }
+
+    await supabase.from("brand_assets").update({ type: nextType }).eq("id", asset.id);
   }
 }
 
@@ -594,6 +759,138 @@ function inferBrandAssetType(fileName: string, contentType: string, fallback: st
   return normalizeBrandAssetType(fallback);
 }
 
+function classifyAssetFromName(fileName: string, currentType: string) {
+  const lower = fileName.toLowerCase();
+
+  if (lower.includes("logo")) return "logo";
+  if (
+    lower.includes("simbolo") ||
+    lower.includes("símbolo") ||
+    lower.includes("symbol") ||
+    lower.includes("favicon") ||
+    lower.includes("avatar") ||
+    lower.includes("icon")
+  ) {
+    return "reference";
+  }
+  if (lower.includes("template")) return "template";
+  if (lower.includes("screenshot") || lower.includes("screen")) return "screenshot";
+  if (lower.includes("background") || lower.includes("bg")) return "background";
+
+  return normalizeBrandAssetType(currentType);
+}
+
+function stripHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractLikelyColors(value: string) {
+  const matches = value.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
+  const counts = new Map<string, number>();
+
+  for (const color of matches) {
+    const normalized = color.toLowerCase();
+    counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 16)
+    .map(([color, count]) => ({ color, count }));
+}
+
+function countBy<T extends Record<string, unknown>>(items: T[], key: keyof T) {
+  return items.reduce<Record<string, number>>((acc, item) => {
+    const value = String(item[key] ?? "unknown");
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
+function buildBrandKnowledgeSummary(input: {
+  assetInventory: Array<{
+    title: string;
+    type: string;
+    content_type: string | null;
+    tags: string[];
+    usage_notes: string;
+  }>;
+  referenceInventory: Array<{
+    title: string;
+    type: string;
+    url: string;
+    tags: string[];
+    usage_notes: string;
+  }>;
+  visualIdentity: {
+    asset_counts: Record<string, number>;
+    content_types: Record<string, number>;
+    names: string[];
+    likely_colors: Array<{ color: string; count: number }>;
+    html_excerpt: string;
+  };
+}) {
+  const logos = input.assetInventory.filter((asset) => asset.type === "logo");
+  const references = input.assetInventory.filter(
+    (asset) => asset.type === "reference",
+  );
+  const colors = input.visualIdentity.likely_colors
+    .map((item) => item.color)
+    .join(", ");
+
+  return [
+    `Inventário: ${input.assetInventory.length} assets proprietários e ${input.referenceInventory.length} links de referência.`,
+    logos.length
+      ? `Logos disponíveis: ${logos.map((asset) => asset.title).join("; ")}.`
+      : "Nenhum logo classificado explicitamente.",
+    references.length
+      ? `Referências visuais/documentais: ${references.map((asset) => asset.title).join("; ")}.`
+      : "",
+    colors ? `Cores prováveis extraídas: ${colors}.` : "",
+    input.visualIdentity.html_excerpt
+      ? `Texto extraído do design system: ${input.visualIdentity.html_excerpt.slice(0, 2500)}`
+      : "",
+    "Diretriz para geração: priorizar assets proprietários e manter consistência visual antes de recorrer a Pexels.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function getLatestBrandKnowledgePromptContext() {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brand_knowledge")
+    .select("summary,visual_identity,asset_inventory,reference_inventory,created_at")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Erro ao carregar conhecimento da marca: ${error.message}`);
+  }
+
+  if (!data) {
+    return "";
+  }
+
+  return [
+    data.summary,
+    `Visual identity JSON: ${JSON.stringify(data.visual_identity).slice(0, 4000)}`,
+    `Assets: ${JSON.stringify(data.asset_inventory).slice(0, 5000)}`,
+    `Referências: ${JSON.stringify(data.reference_inventory).slice(0, 2000)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 12000);
+}
+
 function normalizeBrandReferenceType(value: string) {
   const allowed = new Set([
     "design_system",
@@ -643,11 +940,12 @@ export async function generateEditorialPlan(input: {
 
   const supabase = getSupabaseAdminClient();
   const fallback = buildFallbackPlan(input);
+  const brandKnowledge = await getLatestBrandKnowledgePromptContext();
   const startedAt = Date.now();
   const generated = await generateJsonWithGroq<{ posts: GeneratedDraft[] }>({
     system:
       "Você é um planejador editorial sênior para Instagram e LinkedIn. Gere somente JSON válido. Foque em viralização ética, clareza, especificidade e aprovação humana antes de publicação.",
-    prompt: buildPlannerPrompt(input),
+    prompt: buildPlannerPrompt(input, brandKnowledge),
     fallback,
   });
   const posts = normalizeGeneratedPosts(generated.data.posts, input.postsCount);
@@ -823,7 +1121,7 @@ function buildPlannerPrompt(input: {
   designSystem: string;
   toneOfVoice: string;
   postsCount: number;
-}) {
+}, brandKnowledge: string) {
   return `Gere ${input.postsCount} posts para um calendário editorial.
 
 Responda exclusivamente no formato:
@@ -855,6 +1153,9 @@ Personas: ${input.personas}
 Dores e remédio: ${input.painsAndRemedies}
 Design system: ${input.designSystem}
 Tom de voz: ${input.toneOfVoice}
+
+Conhecimento extraído dos assets e referências da marca:
+${brandKnowledge || "Nenhum conhecimento de marca ingerido ainda."}
 
 Critérios: hooks específicos, evitar clichês, adaptar Instagram e LinkedIn, não prometer resultado impossível, e sempre deixar pronto para aprovação humana.`;
 }

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   createPostAction,
+  buildBrandKnowledgeAction,
   createBrandReferenceAction,
   deleteBrandAssetAction,
   deleteBrandReferenceAction,
@@ -169,12 +170,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     mediaAssets: 0,
                     brandAssets: 0,
                     brandReferences: 0,
+                    brandKnowledge: 0,
                     zernioEvents: 0,
                   },
                   recentEvents: [],
                   recentDrafts: [],
                   recentBrandAssets: [],
                   recentBrandReferences: [],
+                  latestBrandKnowledge: null,
                 }
           }
           groqReady={groqConfig.hasApiKey}
@@ -447,7 +450,7 @@ function EditorialPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-8">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MiniMetric label="Perfis" value={status.counts.brandProfiles} />
         <MiniMetric label="Personas" value={status.counts.personas} />
         <MiniMetric label="Pilares" value={status.counts.contentPillars} />
@@ -455,6 +458,7 @@ function EditorialPanel({
         <MiniMetric label="Drafts" value={status.counts.postDrafts} />
         <MiniMetric label="Marca" value={status.counts.brandAssets} />
         <MiniMetric label="Links" value={status.counts.brandReferences} />
+        <MiniMetric label="Conhecimento" value={status.counts.brandKnowledge} />
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
       </div>
@@ -484,6 +488,38 @@ function EditorialPanel({
           Suba arquivos proprietários ou salve links externos como design
           system, Figma, Canva, site e brand book.
         </p>
+
+        <div className="mt-4 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+            <div>
+              <h4 className="font-medium text-white">
+                Conhecimento da marca
+              </h4>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                Analisa HTML/SVG, inventaria assets e cria um resumo usado pelo
+                gerador de posts. Rode novamente depois de subir novos arquivos.
+              </p>
+              {status.latestBrandKnowledge ? (
+                <p className="mt-3 line-clamp-3 text-sm text-cyan-100">
+                  {status.latestBrandKnowledge.summary}
+                </p>
+              ) : (
+                <p className="mt-3 text-sm text-amber-100">
+                  Ainda não há conhecimento de marca ingerido.
+                </p>
+              )}
+            </div>
+            <form action={buildBrandKnowledgeAction}>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+              >
+                <Sparkles className="size-4" />
+                Analisar marca
+              </button>
+            </form>
+          </div>
+        </div>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
         <form

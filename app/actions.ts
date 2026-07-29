@@ -9,6 +9,7 @@ import {
   verifyAdminPassword,
 } from "@/lib/auth";
 import {
+  buildBrandKnowledge,
   createBrandReference,
   deleteBrandAsset,
   deleteBrandReference,
@@ -229,6 +230,25 @@ export async function createBrandReferenceAction(formData: FormData) {
       error instanceof Error
         ? error.message
         : "Erro ao salvar referência da marca.",
+    );
+  }
+}
+
+export async function buildBrandKnowledgeAction() {
+  await requireAdminAction();
+
+  try {
+    const result = await buildBrandKnowledge();
+
+    revalidatePath("/");
+    redirectWithResult(
+      "notice",
+      `Marca analisada: ${result.assets} assets, ${result.references} links e ${result.colors} cores prováveis.`,
+    );
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao analisar marca.",
     );
   }
 }
