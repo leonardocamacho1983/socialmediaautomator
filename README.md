@@ -60,6 +60,7 @@ Schema aplicado:
 - `content_pillars`
 - `content_calendar_items`
 - `media_assets`
+- `brand_assets`
 - `post_drafts`
 - `generation_runs`
 - `zernio_events`
@@ -80,3 +81,17 @@ O dashboard inclui um formulário para gerar calendário e drafts a partir do br
 - Sem `PEXELS_API_KEY`, os drafts são criados sem mídia automática.
 
 Nada é publicado automaticamente. Os drafts ficam no Supabase para revisão humana antes de envio à Zernio.
+
+## Assets da marca
+
+O dashboard permite subir assets proprietários para um bucket privado do Supabase Storage:
+
+- logos
+- fotos
+- produto
+- screenshots
+- templates
+- fundos
+- referências visuais
+
+Os metadados ficam em `brand_assets`; os arquivos ficam no bucket privado `brand-assets`. O bucket é criado automaticamente no primeiro upload se ainda não existir.

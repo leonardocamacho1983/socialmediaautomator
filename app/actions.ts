@@ -8,7 +8,7 @@ import {
   setAdminSession,
   verifyAdminPassword,
 } from "@/lib/auth";
-import { generateEditorialPlan } from "@/lib/editorial-store";
+import { generateEditorialPlan, uploadBrandAsset } from "@/lib/editorial-store";
 import { compactErrorForUrl, getFormString, parseCreatePostPayload } from "@/lib/forms";
 import {
   createPost,
@@ -158,6 +158,38 @@ export async function generateEditorialPlanAction(formData: FormData) {
       error instanceof Error
         ? error.message
         : "Erro ao gerar calendário editorial.",
+    );
+  }
+}
+
+export async function uploadBrandAssetAction(formData: FormData) {
+  await requireAdminAction();
+
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    throw new Error("Arquivo ausente.");
+  }
+
+  try {
+    await uploadBrandAsset({
+      file,
+      type: getFormString(formData, "type"),
+      title: getFormString(formData, "title") || file.name,
+      description: getFormString(formData, "description"),
+      tags: getFormString(formData, "tags")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      usageNotes: getFormString(formData, "usageNotes"),
+    });
+
+    revalidatePath("/");
+    redirectWithResult("notice", "Asset da marca salvo.");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao subir asset da marca.",
     );
   }
 }

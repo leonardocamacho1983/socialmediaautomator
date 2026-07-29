@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
+  Upload,
   Send,
   Trash2,
 } from "lucide-react";
@@ -13,6 +14,7 @@ import {
   createPostAction,
   generateEditorialPlanAction,
   logoutAction,
+  uploadBrandAssetAction,
   updateExistingPostAction,
 } from "@/app/actions";
 import { requireAdminPage } from "@/lib/auth";
@@ -161,10 +163,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     calendarItems: 0,
                     postDrafts: 0,
                     mediaAssets: 0,
+                    brandAssets: 0,
                     zernioEvents: 0,
                   },
                   recentEvents: [],
                   recentDrafts: [],
+                  recentBrandAssets: [],
                 }
           }
           groqReady={groqConfig.hasApiKey}
@@ -438,14 +442,127 @@ function EditorialPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-8">
         <MiniMetric label="Perfis" value={status.counts.brandProfiles} />
         <MiniMetric label="Personas" value={status.counts.personas} />
         <MiniMetric label="Pilares" value={status.counts.contentPillars} />
         <MiniMetric label="Calendário" value={status.counts.calendarItems} />
         <MiniMetric label="Drafts" value={status.counts.postDrafts} />
+        <MiniMetric label="Marca" value={status.counts.brandAssets} />
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <h3 className="font-medium text-white">Assets visuais da marca</h3>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Suba logos, fotos, screenshots, templates e referências. O bucket é
+          privado no Supabase Storage.
+        </p>
+
+        <form
+          action={uploadBrandAssetAction}
+          className="mt-5 grid gap-4"
+          encType="multipart/form-data"
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+            <Field label="Arquivo">
+              <input
+                required
+                name="file"
+                type="file"
+                accept="image/*,video/mp4,video/quicktime,application/pdf"
+                className="input"
+              />
+            </Field>
+            <Field label="Tipo">
+              <select name="type" defaultValue="photo" className="input">
+                <option value="logo">Logo</option>
+                <option value="photo">Foto</option>
+                <option value="product">Produto</option>
+                <option value="screenshot">Screenshot</option>
+                <option value="template">Template</option>
+                <option value="background">Fundo</option>
+                <option value="reference">Referência</option>
+                <option value="other">Outro</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Título">
+              <input
+                name="title"
+                placeholder="Ex: Logo principal, foto fundador, capa carrossel..."
+                className="input"
+              />
+            </Field>
+            <Field label="Tags separadas por vírgula">
+              <input
+                name="tags"
+                placeholder="logo, claro, institucional"
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Descrição">
+              <textarea
+                name="description"
+                rows={3}
+                placeholder="O que é este asset."
+                className="input"
+              />
+            </Field>
+            <Field label="Notas de uso">
+              <textarea
+                name="usageNotes"
+                rows={3}
+                placeholder="Quando usar, quando evitar, restrições."
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            <Upload className="size-4" />
+            Subir asset da marca
+          </button>
+        </form>
+
+        {status.recentBrandAssets.length ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {status.recentBrandAssets.map((asset) => (
+              <article
+                key={asset.id}
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                    {asset.type}
+                  </span>
+                  <span className="text-xs text-zinc-600">
+                    {formatDate(asset.created_at)}
+                  </span>
+                </div>
+                <h4 className="line-clamp-2 font-medium text-white">
+                  {asset.title}
+                </h4>
+                <p className="mt-2 truncate font-mono text-xs text-zinc-600">
+                  {asset.storage_path}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-zinc-400">
+            Nenhum asset proprietário salvo ainda.
+          </p>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">

@@ -1,5 +1,6 @@
 import "server-only";
 
+import crypto from "node:crypto";
 import { generateJsonWithGroq } from "@/lib/groq";
 import { searchPexelsAsset, type PexelsAsset } from "@/lib/pexels";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -28,6 +29,7 @@ export type EditorialStatus = {
     calendarItems: number;
     postDrafts: number;
     mediaAssets: number;
+    brandAssets: number;
     zernioEvents: number;
   };
   recentEvents: Array<{
@@ -44,6 +46,15 @@ export type EditorialStatus = {
     status: string;
     created_at: string;
   }>;
+  recentBrandAssets: Array<{
+    id: string;
+    title: string;
+    type: string;
+    storage_bucket: string;
+    storage_path: string;
+    content_type: string | null;
+    created_at: string;
+  }>;
 };
 
 const EMPTY_STATUS: EditorialStatus = {
@@ -55,10 +66,12 @@ const EMPTY_STATUS: EditorialStatus = {
     calendarItems: 0,
     postDrafts: 0,
     mediaAssets: 0,
+    brandAssets: 0,
     zernioEvents: 0,
   },
   recentEvents: [],
   recentDrafts: [],
+  recentBrandAssets: [],
 };
 
 const COUNT_TABLES = {
@@ -68,6 +81,7 @@ const COUNT_TABLES = {
   calendarItems: "content_calendar_items",
   postDrafts: "post_drafts",
   mediaAssets: "media_assets",
+  brandAssets: "brand_assets",
   zernioEvents: "zernio_events",
 } as const;
 
@@ -78,7 +92,7 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
 
   const supabase = getSupabaseAdminClient();
 
-  const [counts, recentEvents, recentDrafts] = await Promise.all([
+  const [counts, recentEvents, recentDrafts, recentBrandAssets] = await Promise.all([
     Promise.all(
       Object.entries(COUNT_TABLES).map(async ([key, table]) => {
         const { count, error } = await supabase
@@ -102,6 +116,11 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .select("id,title,platform,status,created_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("brand_assets")
+      .select("id,title,type,storage_bucket,storage_path,content_type,created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   if (recentEvents.error) {
@@ -116,12 +135,146 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     );
   }
 
+  if (recentBrandAssets.error) {
+    throw new Error(
+      `Erro ao listar assets da marca: ${recentBrandAssets.error.message}`,
+    );
+  }
+
   return {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
     recentDrafts: recentDrafts.data ?? [],
+    recentBrandAssets: recentBrandAssets.data ?? [],
   };
+}
+
+export async function uploadBrandAsset(input: {
+  file: File;
+  type: string;
+  title: string;
+  description: string;
+  tags: string[];
+  usageNotes: string;
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!input.file.size) {
+    throw new Error("Arquivo vazio.");
+  }
+
+  if (input.file.size > 50 * 1024 * 1024) {
+    throw new Error("Arquivo acima de 50MB.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  await ensureBrandAssetsBucket();
+
+  const extension = getSafeExtension(input.file.name, input.file.type);
+  const storagePath = `${new Date().toISOString().slice(0, 10)}/${cryptoRandomId()}${extension}`;
+  const buffer = Buffer.from(await input.file.arrayBuffer());
+  const { error: uploadError } = await supabase.storage
+    .from("brand-assets")
+    .upload(storagePath, buffer, {
+      contentType: input.file.type || "application/octet-stream",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Erro ao subir asset: ${uploadError.message}`);
+  }
+
+  const { data, error } = await supabase
+    .from("brand_assets")
+    .insert({
+      type: normalizeBrandAssetType(input.type),
+      title: input.title || input.file.name,
+      description: input.description,
+      storage_bucket: "brand-assets",
+      storage_path: storagePath,
+      content_type: input.file.type || null,
+      size_bytes: input.file.size,
+      tags: input.tags,
+      usage_notes: input.usageNotes,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Erro ao salvar asset: ${error.message}`);
+  }
+
+  return data;
+}
+
+async function ensureBrandAssetsBucket() {
+  const supabase = getSupabaseAdminClient();
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+
+  if (listError) {
+    throw new Error(`Erro ao listar buckets: ${listError.message}`);
+  }
+
+  if (buckets.some((bucket) => bucket.name === "brand-assets")) {
+    return;
+  }
+
+  const { error } = await supabase.storage.createBucket("brand-assets", {
+    public: false,
+    fileSizeLimit: 50 * 1024 * 1024,
+    allowedMimeTypes: [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+      "video/mp4",
+      "video/quicktime",
+      "application/pdf",
+    ],
+  });
+
+  if (error) {
+    throw new Error(`Erro ao criar bucket brand-assets: ${error.message}`);
+  }
+}
+
+function cryptoRandomId() {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+function getSafeExtension(fileName: string, contentType: string) {
+  const match = fileName.toLowerCase().match(/\.[a-z0-9]+$/);
+
+  if (match?.[0] && match[0].length <= 8) {
+    return match[0];
+  }
+
+  if (contentType === "image/jpeg") return ".jpg";
+  if (contentType === "image/png") return ".png";
+  if (contentType === "image/webp") return ".webp";
+  if (contentType === "video/mp4") return ".mp4";
+  if (contentType === "application/pdf") return ".pdf";
+
+  return "";
+}
+
+function normalizeBrandAssetType(value: string) {
+  const allowed = new Set([
+    "logo",
+    "photo",
+    "product",
+    "screenshot",
+    "template",
+    "background",
+    "reference",
+    "other",
+  ]);
+
+  return allowed.has(value) ? value : "other";
 }
 
 export async function generateEditorialPlan(input: {
