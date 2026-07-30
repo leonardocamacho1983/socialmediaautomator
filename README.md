@@ -33,6 +33,24 @@ npm run dev
 
 Abra `http://localhost:3000`.
 
+Se o app local redirecionar para `/setup`, falta `ADMIN_PASSWORD` no `.env.local`.
+Em produção, as páginas internas devem redirecionar para `/login` quando não há
+sessão ativa.
+
+## Páginas do Studio
+
+O app usa páginas reais, não um dashboard único com âncoras:
+
+- `/` — cockpit com métricas e próximas ações
+- `/marca` — assets, links, design system e análise da marca
+- `/ideias` — geração e curadoria de ideias
+- `/criacao` — previews e drafts gerados
+- `/publicacao` — criação manual, agendamento e publicação via Zernio
+- `/sistema` — webhooks, posts sincronizados e operação técnica
+
+O fluxo recomendado é: treinar marca → gerar ideias → aprovar ângulos → revisar
+criativos → publicar → monitorar eventos.
+
 ## Zernio
 
 Endpoints usados:

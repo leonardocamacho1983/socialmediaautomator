@@ -160,23 +160,76 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <StatCard label="Falhas" value={stats.failed} tone="danger" />
           </section>
 
-        <EditorialPanel
-          status={editorialStatus}
-          groqReady={groqConfig.hasApiKey}
-          pexelsReady={pexelsConfig.hasApiKey}
-        />
+          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-white">
+                Fluxo de produção
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+                A Home agora é o cockpit. Cada etapa operacional abre em uma
+                página própria para evitar o painel infinito e deixar claro o
+                que fazer em seguida.
+              </p>
+            </div>
 
-          <section
-            id="publish"
-            className="grid scroll-mt-6 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]"
-          >
-            <CreatePostPanel accounts={accounts} />
-            <AccountsPanel accounts={accounts} />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <a
+                href="/marca"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
+              >
+                <p className="text-sm font-semibold text-white">
+                  1. Treinar marca
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Logos, design system, assets, referências e análise.
+                </p>
+              </a>
+              <a
+                href="/ideias"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
+              >
+                <p className="text-sm font-semibold text-white">
+                  2. Curar ideias
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Gerar ângulos, aprovar o que tem força e descartar ruído.
+                </p>
+              </a>
+              <a
+                href="/criacao"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
+              >
+                <p className="text-sm font-semibold text-white">
+                  3. Revisar criativos
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Previews, copy, mídia sugerida e direção visual.
+                </p>
+              </a>
+              <a
+                href="/publicacao"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
+              >
+                <p className="text-sm font-semibold text-white">
+                  4. Publicar
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Criar rascunho final, agendar ou publicar pela Zernio.
+                </p>
+              </a>
+              <a
+                href="/sistema"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
+              >
+                <p className="text-sm font-semibold text-white">
+                  5. Monitorar
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Webhooks, posts sincronizados, falhas e operação.
+                </p>
+              </a>
+            </div>
           </section>
-
-          <div id="system" className="scroll-mt-6">
-            <PostsPanel posts={posts} />
-          </div>
         </div>
       </div>
     </main>
