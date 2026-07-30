@@ -14,13 +14,17 @@ import {
 import {
   createPostAction,
   buildBrandKnowledgeAction,
+  clearDraftMediaAction,
+  createDraftFromIdeaAction,
   createBrandReferenceAction,
+  deleteContentIdeaAction,
   deleteBrandAssetAction,
   deleteBrandReferenceAction,
   generateContentIdeasAction,
   generateEditorialPlanAction,
   logoutAction,
   uploadBrandAssetAction,
+  updateContentIdeaAction,
   updateContentIdeaStatusAction,
   updateExistingPostAction,
 } from "@/app/actions";
@@ -1194,6 +1198,8 @@ export function EditorialPanel({
             {status.recentDrafts.length} recentes
           </span>
         </div>
+        <ApprovedIdeasForCreation ideas={status.recentIdeas} />
+
         {status.recentDrafts.length ? (
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             {status.recentDrafts.map((draft) => (
@@ -1498,9 +1504,20 @@ function DraftPreviewCard({
 
         {media ? (
           <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-              Mídia sugerida
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Mídia sugerida
+              </p>
+              <form action={clearDraftMediaAction}>
+                <input type="hidden" name="draftId" value={draft.id} />
+                <button
+                  type="submit"
+                  className="rounded-full border border-red-400/20 px-2.5 py-1 text-[11px] font-semibold text-red-100 transition hover:bg-red-500/10"
+                >
+                  Remover imagem
+                </button>
+              </form>
+            </div>
             <a
               href={media.url}
               target="_blank"
@@ -1514,6 +1531,83 @@ function DraftPreviewCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function ApprovedIdeasForCreation({
+  ideas,
+}: {
+  ideas: EditorialStatus["recentIdeas"];
+}) {
+  const approvedIdeas = ideas.filter((idea) =>
+    ["approved", "expanded"].includes(idea.status),
+  );
+
+  if (!approvedIdeas.length) {
+    return (
+      <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-black/20 p-5">
+        <h4 className="font-medium text-white">Nenhuma ideia aprovada na fila</h4>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Aprove ideias na aba Ideias. Elas aparecerão aqui para virar draft
+          antes de publicação.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-4">
+      <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+        <div>
+          <h4 className="font-medium text-white">Ideias aprovadas para criar</h4>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            Estas ideias foram aprovadas, mas só viram post quando você cria um
+            draft a partir delas.
+          </p>
+        </div>
+        <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-100">
+          {approvedIdeas.length} na fila
+        </span>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {approvedIdeas.map((idea) => (
+          <article
+            key={idea.id}
+            className="rounded-2xl border border-white/10 bg-black/25 p-4"
+          >
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                {idea.platform}
+              </span>
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-300">
+                {idea.format}
+              </span>
+              <PostStatusPill status={idea.status} />
+            </div>
+            <h5 className="text-base font-semibold leading-snug text-white">
+              {idea.hook}
+            </h5>
+            <p className="mt-2 text-sm text-cyan-100">{idea.topic}</p>
+            {idea.draft_id ? (
+              <p className="mt-4 rounded-xl bg-white/10 px-3 py-2 text-xs text-zinc-300">
+                Draft já criado.
+              </p>
+            ) : (
+              <form action={createDraftFromIdeaAction} className="mt-4">
+                <input type="hidden" name="ideaId" value={idea.id} />
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                >
+                  Criar draft desta ideia
+                </button>
+              </form>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1536,7 +1630,9 @@ function IdeasReviewPanel({
 
   const grouped = {
     generated: ideas.filter((idea) => idea.status === "generated"),
-    approved: ideas.filter((idea) => idea.status === "approved"),
+    approved: ideas.filter((idea) =>
+      ["approved", "expanded"].includes(idea.status),
+    ),
     rejected: ideas.filter((idea) => idea.status === "rejected"),
   };
 
@@ -1605,7 +1701,64 @@ function IdeasReviewPanel({
                 ) : null}
               </div>
 
-              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <form action={updateContentIdeaAction} className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <input type="hidden" name="ideaId" value={idea.id} />
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <Field label="Hook / prompt principal">
+                    <textarea name="hook" rows={3} defaultValue={idea.hook} className="input" />
+                  </Field>
+                  <Field label="Tema">
+                    <textarea name="topic" rows={3} defaultValue={idea.topic} className="input" />
+                  </Field>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <Field label="Dor">
+                    <textarea name="pain" rows={3} defaultValue={idea.pain} className="input" />
+                  </Field>
+                  <Field label="Promessa">
+                    <textarea name="promise" rows={3} defaultValue={idea.promise} className="input" />
+                  </Field>
+                </div>
+                <Field label="Hipótese viral / direção do prompt">
+                  <textarea
+                    name="viralHypothesis"
+                    rows={3}
+                    defaultValue={idea.viral_hypothesis}
+                    className="input"
+                  />
+                </Field>
+                <div className="grid gap-3 lg:grid-cols-[1fr_1fr_120px]">
+                  <Field label="Plataforma">
+                    <select name="platform" defaultValue={idea.platform} className="input">
+                      <option value="instagram">Instagram</option>
+                      <option value="linkedin">LinkedIn</option>
+                      <option value="both">Instagram + LinkedIn</option>
+                    </select>
+                  </Field>
+                  <Field label="Formato">
+                    <input name="format" defaultValue={idea.format} className="input" />
+                  </Field>
+                  <Field label="Score">
+                    <input name="score" type="number" min={0} max={100} defaultValue={idea.score ?? ""} className="input" />
+                  </Field>
+                </div>
+                <Field label="Notas para edição do prompt">
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    placeholder="Ex: deixar mais provocativo, evitar estatística sem fonte, trocar por frase de impacto..."
+                    className="input"
+                  />
+                </Field>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+                >
+                  Salvar edição do prompt
+                </button>
+              </form>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
                 <form action={updateContentIdeaStatusAction}>
                   <input type="hidden" name="ideaId" value={idea.id} />
                   <button
@@ -1626,6 +1779,15 @@ function IdeasReviewPanel({
                     className="inline-flex w-full items-center justify-center rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
                   >
                     Descartar
+                  </button>
+                </form>
+                <form action={deleteContentIdeaAction}>
+                  <input type="hidden" name="ideaId" value={idea.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                  >
+                    Deletar ideia
                   </button>
                 </form>
               </div>

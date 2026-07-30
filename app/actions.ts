@@ -10,11 +10,15 @@ import {
 } from "@/lib/auth";
 import {
   buildBrandKnowledge,
+  clearDraftMedia,
+  createDraftFromIdea,
   createBrandReference,
+  deleteContentIdea,
   deleteBrandAsset,
   deleteBrandReference,
   generateContentIdeas,
   generateEditorialPlan,
+  updateContentIdea,
   updateContentIdeaStatus,
   uploadBrandAsset,
 } from "@/lib/editorial-store";
@@ -26,8 +30,12 @@ import {
   updatePost,
 } from "@/lib/zernio";
 
-function redirectWithResult(kind: "notice" | "error", value: string) {
-  redirect(`/?${kind}=${compactErrorForUrl(value)}`);
+function redirectWithResult(
+  kind: "notice" | "error",
+  value: string,
+  path = "/",
+) {
+  redirect(`${path}?${kind}=${compactErrorForUrl(value)}`);
 }
 
 export async function loginAction(formData: FormData) {
@@ -193,6 +201,7 @@ export async function generateContentIdeasAction(formData: FormData) {
     redirectWithResult(
       "notice",
       `${result.generated} ideias geradas usando ${result.provider}. Revise antes de transformar em posts.`,
+      "/ideias",
     );
   } catch (error) {
     redirectWithResult(
@@ -220,14 +229,111 @@ export async function updateContentIdeaStatusAction(formData: FormData) {
     });
 
     revalidatePath("/");
+    revalidatePath("/ideias");
+    revalidatePath("/criacao");
     redirectWithResult(
       "notice",
       status === "approved" ? "Ideia aprovada." : "Ideia descartada.",
+      "/ideias",
     );
   } catch (error) {
     redirectWithResult(
       "error",
       error instanceof Error ? error.message : "Erro ao atualizar ideia.",
+    );
+  }
+}
+
+export async function updateContentIdeaAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    const scoreValue = getFormString(formData, "score");
+
+    await updateContentIdea({
+      ideaId: getFormString(formData, "ideaId"),
+      topic: getFormString(formData, "topic"),
+      hook: getFormString(formData, "hook"),
+      pain: getFormString(formData, "pain"),
+      promise: getFormString(formData, "promise"),
+      viralHypothesis: getFormString(formData, "viralHypothesis"),
+      platform: getFormString(formData, "platform"),
+      format: getFormString(formData, "format"),
+      score: scoreValue ? Number(scoreValue) : null,
+      notes: getFormString(formData, "notes"),
+    });
+
+    revalidatePath("/");
+    revalidatePath("/ideias");
+    revalidatePath("/criacao");
+    redirectWithResult("notice", "Ideia editada.", "/ideias");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao editar ideia.",
+      "/ideias",
+    );
+  }
+}
+
+export async function deleteContentIdeaAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    await deleteContentIdea(getFormString(formData, "ideaId"));
+
+    revalidatePath("/");
+    revalidatePath("/ideias");
+    revalidatePath("/criacao");
+    redirectWithResult("notice", "Ideia deletada.", "/ideias");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao deletar ideia.",
+      "/ideias",
+    );
+  }
+}
+
+export async function createDraftFromIdeaAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    const result = await createDraftFromIdea(getFormString(formData, "ideaId"));
+
+    revalidatePath("/");
+    revalidatePath("/ideias");
+    revalidatePath("/criacao");
+    redirectWithResult(
+      "notice",
+      result.created
+        ? "Draft criado a partir da ideia aprovada."
+        : "Essa ideia já tinha um draft.",
+      "/criacao",
+    );
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao criar draft da ideia.",
+      "/criacao",
+    );
+  }
+}
+
+export async function clearDraftMediaAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    await clearDraftMedia(getFormString(formData, "draftId"));
+
+    revalidatePath("/");
+    revalidatePath("/criacao");
+    redirectWithResult("notice", "Imagem removida do draft.", "/criacao");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error ? error.message : "Erro ao remover imagem do draft.",
+      "/criacao",
     );
   }
 }

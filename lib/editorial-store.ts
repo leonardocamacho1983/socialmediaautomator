@@ -64,6 +64,7 @@ export type EditorialStatus = {
     status: string;
     scheduled_for: string | null;
     media_asset_id: string | null;
+    source_idea_id: string | null;
     created_at: string;
     media_asset?: {
       id: string;
@@ -86,6 +87,7 @@ export type EditorialStatus = {
     score: number | null;
     status: string;
     created_at: string;
+    draft_id?: string | null;
   }>;
   recentBrandAssets: Array<{
     id: string;
@@ -223,12 +225,12 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
       .from("content_ideas")
       .select("id,topic,hook,pain,promise,platform,format,viral_hypothesis,score,status,created_at")
       .order("created_at", { ascending: false })
-      .limit(12),
+      .limit(30),
     supabase
       .from("post_drafts")
-      .select("id,title,content,first_comment,hashtags,platform,status,scheduled_for,media_asset_id,created_at")
+      .select("id,title,content,first_comment,hashtags,platform,status,scheduled_for,media_asset_id,source_idea_id,created_at")
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(12),
     supabase
       .from("brand_assets")
       .select("id,title,type,storage_bucket,storage_path,content_type,created_at")
@@ -284,6 +286,11 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
   }
 
   const draftRows = recentDrafts.data ?? [];
+  const draftsByIdeaId = new Map(
+    draftRows
+      .filter((draft) => draft.source_idea_id)
+      .map((draft) => [draft.source_idea_id as string, draft.id]),
+  );
   const mediaAssetIds = draftRows
     .map((draft) => draft.media_asset_id)
     .filter((id): id is string => Boolean(id));
@@ -295,7 +302,10 @@ export async function getEditorialStatus(): Promise<EditorialStatus> {
     configured: true,
     counts: Object.fromEntries(counts) as EditorialStatus["counts"],
     recentEvents: recentEvents.data ?? [],
-    recentIdeas: recentIdeas.data ?? [],
+    recentIdeas: (recentIdeas.data ?? []).map((idea) => ({
+      ...idea,
+      draft_id: draftsByIdeaId.get(idea.id) ?? null,
+    })),
     recentDrafts: draftRows.map((draft) => ({
       ...draft,
       hashtags: Array.isArray(draft.hashtags) ? draft.hashtags : [],
@@ -652,6 +662,179 @@ export async function updateContentIdeaStatus(input: {
 
   if (error) {
     throw new Error(`Erro ao atualizar ideia: ${error.message}`);
+  }
+}
+
+export async function updateContentIdea(input: {
+  ideaId: string;
+  topic: string;
+  hook: string;
+  pain: string;
+  promise: string;
+  viralHypothesis: string;
+  platform: string;
+  format: string;
+  score: number | null;
+  notes: string;
+}) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!input.ideaId) {
+    throw new Error("Ideia ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("content_ideas")
+    .update({
+      topic: input.topic.slice(0, 220),
+      hook: input.hook.slice(0, 300),
+      pain: input.pain.slice(0, 500),
+      promise: input.promise.slice(0, 500),
+      viral_hypothesis: input.viralHypothesis.slice(0, 800),
+      platform: normalizePlatform(input.platform),
+      format: input.format.slice(0, 80) || "post",
+      score:
+        typeof input.score === "number"
+          ? Math.max(0, Math.min(100, Math.round(input.score)))
+          : null,
+      notes: input.notes.slice(0, 1000),
+    })
+    .eq("id", input.ideaId);
+
+  if (error) {
+    throw new Error(`Erro ao editar ideia: ${error.message}`);
+  }
+}
+
+export async function deleteContentIdea(ideaId: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!ideaId) {
+    throw new Error("Ideia ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("content_ideas").delete().eq("id", ideaId);
+
+  if (error) {
+    throw new Error(`Erro ao deletar ideia: ${error.message}`);
+  }
+}
+
+export async function createDraftFromIdea(ideaId: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!ideaId) {
+    throw new Error("Ideia ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: idea, error: ideaError } = await supabase
+    .from("content_ideas")
+    .select("id,topic,hook,pain,promise,platform,format,viral_hypothesis,score,status")
+    .eq("id", ideaId)
+    .single();
+
+  if (ideaError) {
+    throw new Error(`Erro ao carregar ideia: ${ideaError.message}`);
+  }
+
+  const { data: existingDraft, error: existingError } = await supabase
+    .from("post_drafts")
+    .select("id")
+    .eq("source_idea_id", ideaId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Erro ao verificar draft existente: ${existingError.message}`);
+  }
+
+  if (existingDraft) {
+    return { id: existingDraft.id, created: false };
+  }
+
+  const brandKnowledge = await getLatestBrandKnowledgePromptContext();
+  const fallbackPost = buildFallbackDraftFromIdea(idea);
+  const startedAt = Date.now();
+  const generated = await generateJsonWithGroq<{ posts: GeneratedDraft[] }>({
+    system:
+      "Você é um diretor criativo de social media. Transforme uma ideia aprovada em um único draft de post. Gere somente JSON válido.",
+    prompt: buildDraftFromIdeaPrompt(idea, brandKnowledge),
+    fallback: { posts: [fallbackPost] },
+  });
+  const [post] = normalizeGeneratedPosts(generated.data.posts, 1);
+
+  const { data: generationRun, error: generationError } = await supabase
+    .from("generation_runs")
+    .insert({
+      provider: generated.provider,
+      model: generated.model,
+      task: "create_draft_from_idea",
+      input: { idea },
+      output: { post },
+      status: "completed",
+      duration_ms: Date.now() - startedAt,
+    })
+    .select("id")
+    .single();
+
+  if (generationError) {
+    throw new Error(`Erro ao registrar geração do draft: ${generationError.message}`);
+  }
+
+  const asset = post.pexels_query
+    ? await savePexelsAsset(post.pexels_query, post.format)
+    : null;
+  const { data: draft, error: draftError } = await supabase
+    .from("post_drafts")
+    .insert({
+      source_idea_id: idea.id,
+      media_asset_id: asset?.id ?? null,
+      title: post.title,
+      content: post.content,
+      first_comment: post.first_comment ?? "",
+      hashtags: post.hashtags ?? [],
+      platform: post.platform,
+      status: "draft",
+      generation_run_id: generationRun.id,
+    })
+    .select("id")
+    .single();
+
+  if (draftError) {
+    throw new Error(`Erro ao salvar draft da ideia: ${draftError.message}`);
+  }
+
+  await supabase.from("content_ideas").update({ status: "expanded" }).eq("id", ideaId);
+
+  return { id: draft.id, created: true };
+}
+
+export async function clearDraftMedia(draftId: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase não está configurado.");
+  }
+
+  if (!draftId) {
+    throw new Error("Draft ausente.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("post_drafts")
+    .update({ media_asset_id: null })
+    .eq("id", draftId);
+
+  if (error) {
+    throw new Error(`Erro ao remover imagem do draft: ${error.message}`);
   }
 }
 
@@ -1548,6 +1731,88 @@ function buildFallbackPlan(input: {
       ...base[index % base.length],
       title: `${base[index % base.length].title} #${index + 1}`,
     })),
+  };
+}
+
+function buildDraftFromIdeaPrompt(
+  idea: {
+    topic: string;
+    hook: string;
+    pain: string;
+    promise: string;
+    platform: string;
+    format: string;
+    viral_hypothesis: string;
+    score: number | null;
+  },
+  brandKnowledge: string,
+) {
+  return `Transforme esta ideia aprovada em um único draft de post para social media.
+
+Responda exclusivamente no formato:
+{
+  "posts": [
+    {
+      "title": "título interno",
+      "platform": "instagram" | "linkedin" | "both",
+      "format": "image" | "carousel" | "reel" | "text",
+      "objective": "alcance" | "autoridade" | "leads" | "venda" | "comunidade",
+      "topic": "tema do post",
+      "viral_hook": "hook forte",
+      "angle": "direção estratégica e visual",
+      "content": "legenda completa, específica e pronta para revisão",
+      "first_comment": "opcional",
+      "hashtags": ["tag1", "tag2"],
+      "pexels_query": "busca visual curta em inglês, se fizer sentido",
+      "score": 0
+    }
+  ]
+}
+
+Ideia aprovada:
+- Tema: ${idea.topic}
+- Hook: ${idea.hook}
+- Dor: ${idea.pain}
+- Promessa: ${idea.promise}
+- Plataforma: ${idea.platform}
+- Formato: ${idea.format}
+- Hipótese viral: ${idea.viral_hypothesis}
+- Score: ${idea.score ?? "sem score"}
+
+Conhecimento de marca:
+${brandKnowledge || "Sem conhecimento de marca ingerido."}
+
+Critérios:
+- Não faça legenda genérica.
+- Preserve o hook aprovado como ideia central.
+- Dê direção de arte no campo angle.
+- Se usar Pexels, a query deve representar uma cena útil, não uma foto corporativa genérica.
+- Não publique; apenas gere draft para revisão humana.`;
+}
+
+function buildFallbackDraftFromIdea(idea: {
+  topic: string;
+  hook: string;
+  pain: string;
+  promise: string;
+  platform: string;
+  format: string;
+  viral_hypothesis: string;
+  score: number | null;
+}): GeneratedDraft {
+  return {
+    title: idea.topic || idea.hook,
+    platform: normalizePlatform(idea.platform),
+    format: idea.format || "image",
+    objective: "alcance",
+    topic: idea.topic,
+    viral_hook: idea.hook,
+    angle: `Direção de arte: criar peça editorial com foco no contraste da dor (${idea.pain}) e uma promessa visual clara (${idea.promise}). Evitar foto crua sem tratamento.`,
+    content: `${idea.hook}\n\n${idea.pain ? `O problema: ${idea.pain}\n\n` : ""}${idea.promise ? `${idea.promise}\n\n` : ""}A ideia aqui é mostrar o impacto de forma simples, específica e visual. Use este draft como ponto de partida para revisar copy, criativo e CTA antes de publicar.`,
+    first_comment: "Você já passou por isso no atendimento ou nas vendas?",
+    hashtags: ["atendimento", "vendas", "pequenasempresas"],
+    pexels_query: "small business customer service problem",
+    score: idea.score ?? 70,
   };
 }
 
