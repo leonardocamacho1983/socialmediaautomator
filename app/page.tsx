@@ -73,122 +73,111 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const accounts = accountsResult.ok ? accountsResult.data.accounts : [];
   const posts = postsResult.ok ? postsResult.data.posts : [];
   const stats = getStats(posts);
+  const editorialStatus: EditorialStatus = editorialResult.ok
+    ? editorialResult.data
+    : {
+        configured: false,
+        counts: {
+          brandProfiles: 0,
+          personas: 0,
+          contentPillars: 0,
+          calendarItems: 0,
+          postDrafts: 0,
+          mediaAssets: 0,
+          brandAssets: 0,
+          brandReferences: 0,
+          brandKnowledge: 0,
+          contentIdeas: 0,
+          zernioEvents: 0,
+        },
+        recentEvents: [],
+        recentIdeas: [],
+        recentDrafts: [],
+        recentBrandAssets: [],
+        recentBrandReferences: [],
+        latestBrandKnowledge: null,
+      };
 
   return (
-    <main className="min-h-screen px-5 py-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <header className="flex flex-col justify-between gap-5 rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur lg:flex-row lg:items-center">
-          <div>
-            <p className="mb-3 text-sm uppercase tracking-[0.28em] text-cyan-200/70">
-              Social Media Automator
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              Instagram + LinkedIn via Zernio
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-              Crie rascunhos, aprove manualmente, agende ou publique. Todas as
-              chamadas à Zernio rodam no servidor e usam idempotência por
-              request para reduzir risco de duplicata.
-            </p>
-          </div>
-          <form action={logoutAction}>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="/api/webhooks/zernio/self-test"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl border border-cyan-300/20 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
-              >
-                Testar webhook
-              </a>
-              <button
-                type="submit"
-                className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
-              >
-                Sair
-              </button>
+    <main className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
+      <StudioSidebar />
+
+      <div className="min-w-0 px-5 py-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6">
+          <header
+            id="home"
+            className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] shadow-2xl shadow-black/20 backdrop-blur"
+          >
+            <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr] lg:p-8">
+              <div>
+                <p className="mb-3 text-sm uppercase tracking-[0.28em] text-cyan-200/70">
+                  Social Studio
+                </p>
+                <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
+                  Crie conteúdo social com direção criativa.
+                </h1>
+                <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-300">
+                  Treine a marca, gere ideias, escolha os melhores ângulos,
+                  refine os criativos e publique no Instagram/LinkedIn pela
+                  Zernio.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <a
+                    href="#gerar-calendario"
+                    className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                  >
+                    Gerar ideias
+                  </a>
+                  <a
+                    href="#base-marca"
+                    className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Ver marca
+                  </a>
+                </div>
+              </div>
+              <HomeActionPanel
+                status={editorialStatus}
+                stats={stats}
+                accounts={accounts.length}
+              />
             </div>
-          </form>
-        </header>
+          </header>
 
-        {params.notice ? (
-          <Banner tone="success">{decodeURIComponent(params.notice)}</Banner>
-        ) : null}
+          <StatusMessages
+            params={params}
+            zernioConfig={zernioConfig}
+            accountsResult={accountsResult}
+            postsResult={postsResult}
+            editorialResult={editorialResult}
+          />
 
-        {params.error ? (
-          <Banner tone="error">{decodeURIComponent(params.error)}</Banner>
-        ) : null}
-
-        {!zernioConfig.hasApiKey ? (
-          <Banner tone="warning">
-            ZERNIO_API_KEY não está configurada. O painel carrega, mas ações
-            reais de conta/post não funcionarão até configurar a variável.
-          </Banner>
-        ) : null}
-
-        {!accountsResult.ok ? (
-          <Banner tone="error">
-            Não consegui listar contas da Zernio: {accountsResult.error}
-          </Banner>
-        ) : null}
-
-        {!postsResult.ok ? (
-          <Banner tone="error">
-            Não consegui listar posts da Zernio: {postsResult.error}
-          </Banner>
-        ) : null}
-
-        {!editorialResult.ok ? (
-          <Banner tone="error">
-            Não consegui acessar o Supabase: {editorialResult.error}
-          </Banner>
-        ) : null}
-
-        <section className="grid gap-4 md:grid-cols-5">
-          <StatCard label="Rascunhos" value={stats.draft} />
-          <StatCard label="Agendados" value={stats.scheduled} />
-          <StatCard label="Publicando" value={stats.publishing} />
-          <StatCard label="Publicados" value={stats.published} />
-          <StatCard label="Falhas" value={stats.failed} tone="danger" />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
-          <CreatePostPanel accounts={accounts} />
-          <AccountsPanel accounts={accounts} />
-        </section>
+          <section className="grid gap-4 md:grid-cols-5">
+            <StatCard label="Ideias" value={editorialStatus.counts.contentIdeas} />
+            <StatCard label="Drafts" value={editorialStatus.counts.postDrafts} />
+            <StatCard label="Agendados" value={stats.scheduled} />
+            <StatCard label="Publicados" value={stats.published} />
+            <StatCard label="Falhas" value={stats.failed} tone="danger" />
+          </section>
 
         <EditorialPanel
-          status={
-            editorialResult.ok
-              ? editorialResult.data
-              : {
-                  configured: false,
-                  counts: {
-                    brandProfiles: 0,
-                    personas: 0,
-                    contentPillars: 0,
-                    calendarItems: 0,
-                    postDrafts: 0,
-                    mediaAssets: 0,
-                    brandAssets: 0,
-                    brandReferences: 0,
-                    brandKnowledge: 0,
-                    contentIdeas: 0,
-                    zernioEvents: 0,
-                  },
-                  recentEvents: [],
-                  recentIdeas: [],
-                  recentDrafts: [],
-                  recentBrandAssets: [],
-                  recentBrandReferences: [],
-  latestBrandKnowledge: null,
-                }
-          }
+          status={editorialStatus}
           groqReady={groqConfig.hasApiKey}
           pexelsReady={pexelsConfig.hasApiKey}
         />
 
-        <PostsPanel posts={posts} />
+          <section
+            id="publish"
+            className="grid scroll-mt-6 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]"
+          >
+            <CreatePostPanel accounts={accounts} />
+            <AccountsPanel accounts={accounts} />
+          </section>
+
+          <div id="system" className="scroll-mt-6">
+            <PostsPanel posts={posts} />
+          </div>
+        </div>
       </div>
     </main>
   );
@@ -212,6 +201,172 @@ function getStats(posts: ZernioPost[]) {
       partial: 0,
       cancelled: 0,
     },
+  );
+}
+
+function StudioSidebar() {
+  const items = [
+    ["Home", "#home"],
+    ["Marca", "#base-marca"],
+    ["Ideias", "#gerar-calendario"],
+    ["Criação", "#drafts-gerados"],
+    ["Publicação", "#publish"],
+    ["Sistema", "#system"],
+  ];
+
+  return (
+    <aside className="border-b border-white/10 bg-black/35 px-5 py-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:px-6">
+      <div className="flex items-center justify-between gap-4 lg:block">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
+            Social Studio
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-white">Falay</h2>
+        </div>
+        <form action={logoutAction} className="lg:mt-8">
+          <button
+            type="submit"
+            className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+          >
+            Sair
+          </button>
+        </form>
+      </div>
+
+      <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-8 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
+        {items.map(([label, href]) => (
+          <a
+            key={href}
+            href={href}
+            className="whitespace-nowrap rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-cyan-100 lg:flex"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="mt-8 hidden rounded-3xl border border-white/10 bg-white/[0.04] p-4 lg:block">
+        <p className="text-sm font-semibold text-white">Fluxo recomendado</p>
+        <ol className="mt-3 space-y-2 text-sm leading-6 text-zinc-400">
+          <li>1. Treinar marca</li>
+          <li>2. Gerar ideias</li>
+          <li>3. Aprovar ângulos</li>
+          <li>4. Criar previews</li>
+          <li>5. Publicar</li>
+        </ol>
+      </div>
+    </aside>
+  );
+}
+
+function HomeActionPanel({
+  status,
+  stats,
+  accounts,
+}: {
+  status: EditorialStatus;
+  stats: ReturnType<typeof getStats>;
+  accounts: number;
+}) {
+  const actions = [
+    {
+      label: "Ideias para aprovar",
+      value: status.recentIdeas.filter((idea) => idea.status === "generated")
+        .length,
+      href: "#gerar-calendario",
+    },
+    {
+      label: "Drafts em revisão",
+      value: status.counts.postDrafts,
+      href: "#drafts-gerados",
+    },
+    {
+      label: "Posts agendados",
+      value: stats.scheduled,
+      href: "#publish",
+    },
+    {
+      label: "Contas conectadas",
+      value: accounts,
+      href: "#publish",
+    },
+  ];
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-black/25 p-4">
+      <p className="mb-4 text-sm font-semibold text-white">Próximas ações</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {actions.map((action) => (
+          <a
+            key={action.label}
+            href={action.href}
+            className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/10"
+          >
+            <p className="text-3xl font-semibold text-white">{action.value}</p>
+            <p className="mt-2 text-sm text-zinc-400">{action.label}</p>
+          </a>
+        ))}
+      </div>
+      <a
+        href="/api/webhooks/zernio/self-test"
+        target="_blank"
+        rel="noreferrer"
+        className="mt-4 inline-flex w-full justify-center rounded-2xl border border-cyan-300/20 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+      >
+        Testar integração Zernio
+      </a>
+    </div>
+  );
+}
+
+function StatusMessages({
+  params,
+  zernioConfig,
+  accountsResult,
+  postsResult,
+  editorialResult,
+}: {
+  params: { notice?: string; error?: string };
+  zernioConfig: { hasApiKey: boolean };
+  accountsResult: LoadResult<{ accounts: SocialAccount[] }>;
+  postsResult: LoadResult<unknown>;
+  editorialResult: LoadResult<EditorialStatus>;
+}) {
+  return (
+    <>
+      {params.notice ? (
+        <Banner tone="success">{decodeURIComponent(params.notice)}</Banner>
+      ) : null}
+
+      {params.error ? (
+        <Banner tone="error">{decodeURIComponent(params.error)}</Banner>
+      ) : null}
+
+      {!zernioConfig.hasApiKey ? (
+        <Banner tone="warning">
+          ZERNIO_API_KEY não está configurada. A criação editorial funciona, mas
+          ações reais de publicação não funcionarão até configurar a variável.
+        </Banner>
+      ) : null}
+
+      {!accountsResult.ok ? (
+        <Banner tone="error">
+          Não consegui listar contas da Zernio: {accountsResult.error}
+        </Banner>
+      ) : null}
+
+      {!postsResult.ok ? (
+        <Banner tone="error">
+          Não consegui listar posts da Zernio: {postsResult.error}
+        </Banner>
+      ) : null}
+
+      {!editorialResult.ok ? (
+        <Banner tone="error">
+          Não consegui acessar o Supabase: {editorialResult.error}
+        </Banner>
+      ) : null}
+    </>
   );
 }
 
