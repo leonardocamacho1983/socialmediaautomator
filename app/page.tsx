@@ -45,11 +45,11 @@ type PageProps = {
   }>;
 };
 
-type LoadResult<T> =
+export type LoadResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
-async function load<T>(promise: Promise<T>): Promise<LoadResult<T>> {
+export async function load<T>(promise: Promise<T>): Promise<LoadResult<T>> {
   try {
     return { ok: true, data: await promise };
   } catch (error) {
@@ -123,13 +123,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <a
-                    href="#gerar-calendario"
+                    href="/ideias"
                     className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
                   >
                     Gerar ideias
                   </a>
                   <a
-                    href="#base-marca"
+                    href="/marca"
                     className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                   >
                     Ver marca
@@ -183,7 +183,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   );
 }
 
-function getStats(posts: ZernioPost[]) {
+export function getStats(posts: ZernioPost[]) {
   return posts.reduce(
     (acc, post) => {
       if (post.status in acc) {
@@ -204,14 +204,14 @@ function getStats(posts: ZernioPost[]) {
   );
 }
 
-function StudioSidebar() {
+export function StudioSidebar() {
   const items = [
-    ["Home", "#home"],
-    ["Marca", "#base-marca"],
-    ["Ideias", "#gerar-calendario"],
-    ["Criação", "#drafts-gerados"],
-    ["Publicação", "#publish"],
-    ["Sistema", "#system"],
+    ["Home", "/"],
+    ["Marca", "/marca"],
+    ["Ideias", "/ideias"],
+    ["Criação", "/criacao"],
+    ["Publicação", "/publicacao"],
+    ["Sistema", "/sistema"],
   ];
 
   return (
@@ -259,7 +259,7 @@ function StudioSidebar() {
   );
 }
 
-function HomeActionPanel({
+export function HomeActionPanel({
   status,
   stats,
   accounts,
@@ -273,22 +273,22 @@ function HomeActionPanel({
       label: "Ideias para aprovar",
       value: status.recentIdeas.filter((idea) => idea.status === "generated")
         .length,
-      href: "#gerar-calendario",
+      href: "/ideias",
     },
     {
       label: "Drafts em revisão",
       value: status.counts.postDrafts,
-      href: "#drafts-gerados",
+      href: "/criacao",
     },
     {
       label: "Posts agendados",
       value: stats.scheduled,
-      href: "#publish",
+      href: "/publicacao",
     },
     {
       label: "Contas conectadas",
       value: accounts,
-      href: "#publish",
+      href: "/publicacao",
     },
   ];
 
@@ -319,7 +319,7 @@ function HomeActionPanel({
   );
 }
 
-function StatusMessages({
+export function StatusMessages({
   params,
   zernioConfig,
   accountsResult,
@@ -370,7 +370,7 @@ function StatusMessages({
   );
 }
 
-function Banner({
+export function Banner({
   children,
   tone,
 }: {
@@ -390,7 +390,7 @@ function Banner({
   );
 }
 
-function StatCard({
+export function StatCard({
   label,
   value,
   tone = "default",
@@ -413,7 +413,7 @@ function StatCard({
   );
 }
 
-function CreatePostPanel({ accounts }: { accounts: SocialAccount[] }) {
+export function CreatePostPanel({ accounts }: { accounts: SocialAccount[] }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
       <div className="mb-6">
@@ -515,7 +515,7 @@ function CreatePostPanel({ accounts }: { accounts: SocialAccount[] }) {
   );
 }
 
-function AccountsPanel({ accounts }: { accounts: SocialAccount[] }) {
+export function AccountsPanel({ accounts }: { accounts: SocialAccount[] }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -575,17 +575,26 @@ function AccountsPanel({ accounts }: { accounts: SocialAccount[] }) {
   );
 }
 
-function EditorialPanel({
+export function EditorialPanel({
   status,
   groqReady,
   pexelsReady,
+  section = "all",
 }: {
   status: EditorialStatus;
   groqReady: boolean;
   pexelsReady: boolean;
+  section?: "all" | "brand" | "ideas" | "creation" | "events";
 }) {
+  const showOverview = section === "all";
+  const showBrand = section === "all" || section === "brand";
+  const showIdeas = section === "all" || section === "ideas";
+  const showCreation = section === "all" || section === "creation";
+  const showEvents = section === "all" || section === "events";
+
   return (
     <section id="motor-editorial" className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
+      {showOverview ? (
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div>
           <h2 className="text-xl font-semibold text-white">
@@ -609,7 +618,9 @@ function EditorialPanel({
           </StatusPill>
         </div>
       </div>
+      ) : null}
 
+      {showOverview ? (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MiniMetric label="Perfis" value={status.counts.brandProfiles} />
         <MiniMetric label="Personas" value={status.counts.personas} />
@@ -623,26 +634,30 @@ function EditorialPanel({
         <MiniMetric label="Mídia" value={status.counts.mediaAssets} />
         <MiniMetric label="Webhooks" value={status.counts.zernioEvents} />
       </div>
+      ) : null}
 
+      {showOverview ? (
       <div className="mt-6 grid gap-3 md:grid-cols-4">
-        <a href="#base-marca" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        <a href="/marca" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">1. Base da marca</p>
           <p className="mt-1 text-xs text-zinc-500">Arquivos e links.</p>
         </a>
-        <a href="#gerar-calendario" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        <a href="/ideias" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">2. Gerar ideias</p>
           <p className="mt-1 text-xs text-zinc-500">Briefing → curadoria.</p>
         </a>
-        <a href="#drafts-gerados" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        <a href="/criacao" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">3. Criar posts</p>
           <p className="mt-1 text-xs text-zinc-500">Drafts e previews.</p>
         </a>
-        <a href="#zernio-eventos" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        <a href="/sistema" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">4. Publicação</p>
           <p className="mt-1 text-xs text-zinc-500">Eventos Zernio.</p>
         </a>
       </div>
+      ) : null}
 
+      {showBrand ? (
       <div id="base-marca" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Base da marca</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
@@ -907,7 +922,9 @@ function EditorialPanel({
           </div>
         ) : null}
       </div>
+      ) : null}
 
+      {showIdeas ? (
       <div id="gerar-calendario" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Gerar e escolher ideias</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
@@ -1108,7 +1125,9 @@ function EditorialPanel({
           </button>
         </form>
       </div>
+      ) : null}
 
+      {showCreation ? (
       <div id="drafts-gerados" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
@@ -1134,7 +1153,9 @@ function EditorialPanel({
           </p>
         )}
       </div>
+      ) : null}
 
+      {showEvents ? (
       <div id="zernio-eventos" className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4 scroll-mt-6">
         <h3 className="font-medium text-white">Últimos eventos da Zernio</h3>
         {status.recentEvents.length ? (
@@ -1161,6 +1182,7 @@ function EditorialPanel({
           </p>
         )}
       </div>
+      ) : null}
     </section>
   );
 }
@@ -1562,7 +1584,7 @@ function IdeasReviewPanel({
   );
 }
 
-function PostsPanel({ posts }: { posts: ZernioPost[] }) {
+export function PostsPanel({ posts }: { posts: ZernioPost[] }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
       <div className="mb-6">
