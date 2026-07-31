@@ -9,9 +9,10 @@ This repository currently contains:
 - a minimal home page;
 - a minimal health check at `/api/health`;
 - reset documentation in `docs/reset.md`;
-- Marco 1 Brand Foundation at `/brand`.
+- Marco 1 Brand Foundation at `/brand`;
+- Marco 2 Creative Concept Generator at `/create`.
 
-The app still does not generate posts, assets, automations, analytics, or
+The app still does not generate final posts, assets, automations, analytics, or
 publications.
 
 ## Local

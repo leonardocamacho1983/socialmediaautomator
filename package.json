@@ -11,9 +11,11 @@
     "test": "node --test"
   },
   "dependencies": {
+    "ai": "^7.0.46",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "latest",

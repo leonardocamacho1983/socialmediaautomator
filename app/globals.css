@@ -34,6 +34,7 @@ a {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -132,6 +133,11 @@ h1 {
   color: #ffffff;
 }
 
+.secondary-accent {
+  border-color: var(--accent-warm);
+  background: var(--accent-warm);
+}
+
 .health-link,
 .secondary-button,
 .text-link {
@@ -218,6 +224,7 @@ h2 {
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   border: 1px solid var(--border);
@@ -233,6 +240,7 @@ h2 {
 }
 
 .field input:focus,
+.field select:focus,
 .field textarea:focus {
   border-color: var(--accent);
   outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
@@ -326,6 +334,155 @@ h2 {
   cursor: pointer;
 }
 
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 20px;
+  align-items: start;
+}
+
+.concept-form {
+  align-items: start;
+}
+
+.status-strip {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.status-strip strong {
+  font-size: 1rem;
+}
+
+.status-strip span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.error-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--accent-warm) 42%, transparent);
+  background: color-mix(in srgb, var(--accent-warm) 8%, #ffffff);
+  color: #7a2415;
+  padding: 12px 14px;
+  font-size: 0.93rem;
+  line-height: 1.45;
+}
+
+.concept-aside {
+  min-height: 420px;
+}
+
+.concept-results {
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.concept-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.concept-card {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 20px;
+}
+
+.concept-card-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.concept-card h3 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.05;
+}
+
+.concept-hook {
+  margin: 12px 0 0;
+  color: var(--accent-strong);
+  font-size: 1.05rem;
+  font-weight: 760;
+  line-height: 1.32;
+}
+
+.concept-details {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.concept-details div {
+  display: grid;
+  gap: 4px;
+}
+
+.concept-details dt,
+.concept-card h4,
+.concept-note strong {
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.concept-details dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.concept-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.concept-note {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.concept-note span {
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -341,8 +498,16 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .workflow-grid {
+    grid-template-columns: 1fr;
+  }
+
   .brand-aside {
     position: static;
+  }
+
+  .concept-card-grid {
+    grid-template-columns: 1fr;
   }
 }
 
