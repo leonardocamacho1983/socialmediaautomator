@@ -122,6 +122,13 @@ export function buildVisualProfile(profile: BrandProfile): BrandVisualProfile {
   };
 }
 
+export function stripEmbeddedBrandAssets(profile: BrandProfile): BrandProfile {
+  return {
+    ...profile,
+    logoDataUrl: "",
+  };
+}
+
 export function isBrandProfile(value: unknown): value is BrandProfile {
   if (!value || typeof value !== "object") {
     return false;

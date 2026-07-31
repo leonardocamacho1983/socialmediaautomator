@@ -1,6 +1,19 @@
 import type { BrandProfile } from "../brand/profile";
 import type { CreativeBriefing } from "./concepts";
 
+export function buildCreativePromptBrandContext(brandProfile: BrandProfile) {
+  const { logoDataUrl, ...profileWithoutEmbeddedLogo } = brandProfile;
+
+  return {
+    ...profileWithoutEmbeddedLogo,
+    logo: {
+      hasLogo: Boolean(logoDataUrl || brandProfile.logoFileName),
+      fileName: brandProfile.logoFileName,
+      embeddedAssetOmitted: Boolean(logoDataUrl),
+    },
+  };
+}
+
 export function buildCreativeConceptPrompt(
   brandProfile: BrandProfile,
   briefing: CreativeBriefing,
@@ -24,7 +37,7 @@ export function buildCreativeConceptPrompt(
     "- Prefira especificidade, tensao e ponto de vista.",
     "",
     "Perfil da marca:",
-    JSON.stringify(brandProfile, null, 2),
+    JSON.stringify(buildCreativePromptBrandContext(brandProfile), null, 2),
     "",
     "Briefing do post:",
     JSON.stringify(briefing, null, 2),

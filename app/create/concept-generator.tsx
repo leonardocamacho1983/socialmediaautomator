@@ -6,6 +6,7 @@ import {
   BRAND_PROFILE_STORAGE_KEY,
   emptyBrandProfile,
   isBrandProfile,
+  stripEmbeddedBrandAssets,
   type BrandProfile,
 } from "../../lib/brand/profile";
 import {
@@ -118,18 +119,19 @@ export function ConceptGenerator() {
     setStatus("Gerando tres conceitos criativos distintos.");
 
     try {
+      const generationBrandProfile = stripEmbeddedBrandAssets(brandProfile);
       const response = await fetch("/api/concepts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          brandProfile,
+          brandProfile: generationBrandProfile,
           briefing,
         }),
       });
 
-      const payload: unknown = await response.json();
+      const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const message =
           payload && typeof payload === "object" && "error" in payload
@@ -139,7 +141,7 @@ export function ConceptGenerator() {
       }
 
       const nextProject = createProject(
-        brandProfile,
+        generationBrandProfile,
         briefing,
         payload as CreativeConceptBatch,
       );

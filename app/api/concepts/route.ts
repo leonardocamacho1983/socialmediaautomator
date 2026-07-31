@@ -1,5 +1,13 @@
-import { APICallError, generateText, gateway, Output } from "ai";
+import {
+  APICallError,
+  generateText,
+  gateway,
+  NoObjectGeneratedError,
+  Output,
+  TypeValidationError,
+} from "ai";
 import { z } from "zod";
+import { stripEmbeddedBrandAssets } from "../../../lib/brand/profile";
 import {
   DEFAULT_CREATIVE_CONCEPT_MODEL,
   type CreativeConceptBatch,
@@ -100,6 +108,9 @@ export async function POST(request: Request) {
 
   const model =
     process.env.CREATIVE_CONCEPT_MODEL || DEFAULT_CREATIVE_CONCEPT_MODEL;
+  const generationBrandProfile = stripEmbeddedBrandAssets(
+    parsedRequest.data.brandProfile,
+  );
 
   try {
     const result = await generateText({
@@ -116,7 +127,7 @@ export async function POST(request: Request) {
       system:
         "Voce e um diretor criativo senior, estrategista de social media e editor. Responda em portugues do Brasil. Seu trabalho aqui e criar direcoes criativas distintas, nao posts finais.",
       prompt: buildCreativeConceptPrompt(
-        parsedRequest.data.brandProfile,
+        generationBrandProfile,
         parsedRequest.data.briefing,
       ),
     });
@@ -133,6 +144,11 @@ export async function POST(request: Request) {
 
     return Response.json(batch);
   } catch (error) {
+    console.error("Creative concept generation failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      statusCode: APICallError.isInstance(error) ? error.statusCode : null,
+    });
+
     if (APICallError.isInstance(error)) {
       return Response.json(
         {
@@ -153,6 +169,19 @@ export async function POST(request: Request) {
             "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
         },
         { status: 503 },
+      );
+    }
+
+    if (
+      NoObjectGeneratedError.isInstance(error) ||
+      TypeValidationError.isInstance(error)
+    ) {
+      return Response.json(
+        {
+          error:
+            "O modelo respondeu fora do contrato esperado. Tente gerar novamente.",
+        },
+        { status: 502 },
       );
     }
 

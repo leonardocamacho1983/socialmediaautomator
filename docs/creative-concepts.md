@@ -11,6 +11,7 @@ Included:
 - reads the single brand profile stored by Marco 1;
 - accepts a post briefing;
 - calls the Vercel AI Gateway through the AI SDK;
+- strips embedded brand assets such as `logoDataUrl` before generation;
 - generates exactly three structured creative concepts;
 - shows each concept with hook, central idea, narrative structure, visual
   direction, copy direction, fit rationale, and risk notes;
@@ -77,6 +78,10 @@ socialmediaautomator.creativeProject.v1
 
 This is intentional. Database persistence starts only after the creative
 concept contract proves useful.
+
+Brand images may remain in the browser profile for later visual production, but
+Marco 2 sends only text-safe brand context to the concept generator. The model
+receives whether a logo exists and its file name, not the embedded image data.
 
 ## Validation
 
