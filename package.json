@@ -1,20 +1,16 @@
 {
   "name": "socialmediaautomator",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "npm run typecheck",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.111.0",
-    "@tailwindcss/postcss": "latest",
-    "clsx": "latest",
-    "jszip": "^3.10.1",
-    "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
@@ -23,11 +19,14 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "tailwindcss": "latest",
+    "eslint": "9.39.5",
+    "eslint-config-next": "latest",
     "typescript": "latest"
   },
   "overrides": {
-    "postcss": "8.5.24",
+    "brace-expansion": "5.0.9",
+    "minimatch": "10.2.6",
+    "postcss": "8.5.25",
     "sharp": "0.35.3"
   }
 }
