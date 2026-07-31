@@ -56,11 +56,13 @@ Override with:
 CREATIVE_CONCEPT_MODEL=
 ```
 
-Authentication is handled by:
+Authentication is handled by either:
 
 ```text
 AI_GATEWAY_API_KEY
 ```
+
+or Vercel OIDC in deployment.
 
 ## Local Persistence
 

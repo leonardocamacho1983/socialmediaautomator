@@ -98,17 +98,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const hasGatewayAuth = Boolean(process.env.AI_GATEWAY_API_KEY);
-
-  if (!hasGatewayAuth) {
-    return Response.json(
-      {
-        error: "AI Gateway nao configurado. Vincule AI_GATEWAY_API_KEY.",
-      },
-      { status: 503 },
-    );
-  }
-
   const model =
     process.env.CREATIVE_CONCEPT_MODEL || DEFAULT_CREATIVE_CONCEPT_MODEL;
 
