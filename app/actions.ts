@@ -29,6 +29,8 @@ import {
   getReadableZernioError,
   updatePost,
 } from "@/lib/zernio";
+import { bootstrapSocialOsFoundation } from "@/lib/social-os/foundation-store";
+import type { FunnelStage } from "@/lib/social-os/types";
 
 function redirectWithResult(
   kind: "notice" | "error",
@@ -175,6 +177,34 @@ export async function generateEditorialPlanAction(formData: FormData) {
       error instanceof Error
         ? error.message
         : "Erro ao gerar calendário editorial.",
+    );
+  }
+}
+
+export async function bootstrapSocialOsFoundationAction(formData: FormData) {
+  await requireAdminAction();
+
+  try {
+    const result = await bootstrapSocialOsFoundation({
+      businessName: getFormString(formData, "businessName"),
+      businessSummary: getFormString(formData, "businessSummary"),
+      valueProposition: getFormString(formData, "valueProposition"),
+      targetAudience: getFormString(formData, "targetAudience"),
+      strategicObjective: normalizeStrategicObjective(
+        getFormString(formData, "strategicObjective"),
+      ),
+    });
+
+    revalidatePath("/");
+    revalidatePath("/estrategia");
+    redirectWithResult("notice", result.message, "/estrategia");
+  } catch (error) {
+    redirectWithResult(
+      "error",
+      error instanceof Error
+        ? error.message
+        : "Erro ao inicializar fundacao estrategica.",
+      "/estrategia",
     );
   }
 }
@@ -452,4 +482,21 @@ export async function deleteBrandReferenceAction(formData: FormData) {
       error instanceof Error ? error.message : "Erro ao deletar referência.",
     );
   }
+}
+
+function normalizeStrategicObjective(value: string): FunnelStage {
+  const allowed = new Set<FunnelStage>([
+    "awareness",
+    "consideration",
+    "trust",
+    "conversation",
+    "lead_capture",
+    "conversion",
+    "retention",
+    "advocacy",
+  ]);
+
+  return allowed.has(value as FunnelStage)
+    ? (value as FunnelStage)
+    : "conversation";
 }

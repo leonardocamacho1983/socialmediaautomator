@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions";
+import { FormPendingNotice, PendingSubmitButton } from "@/app/pending-ui";
 import { isAdminAuthenticated, isAdminConfigured } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -55,12 +56,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             />
           </label>
 
-          <button
+          <PendingSubmitButton
             type="submit"
-            className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+            pendingLabel="Entrando"
           >
             Entrar
-          </button>
+          </PendingSubmitButton>
+          <FormPendingNotice label="Validando acesso." />
         </form>
       </section>
     </main>

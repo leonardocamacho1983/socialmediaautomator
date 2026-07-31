@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NavigationFeedbackProvider } from "@/app/pending-ui";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Social Media Automator",
-  description: "Painel para aprovar, agendar e publicar posts via Zernio.",
+  title: "Social Creative OS",
+  description: "Sistema interno para estrategia, criacao, publicacao e engajamento social.",
 };
 
 export default function RootLayout({
@@ -23,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" data-scroll-behavior="smooth">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <NavigationFeedbackProvider>{children}</NavigationFeedbackProvider>
       </body>
     </html>
   );

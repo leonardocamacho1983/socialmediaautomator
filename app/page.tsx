@@ -28,10 +28,17 @@ import {
   updateContentIdeaStatusAction,
   updateExistingPostAction,
 } from "@/app/actions";
+import {
+  AppLink,
+  FormPendingNotice,
+  PendingSubmitButton,
+} from "@/app/pending-ui";
+import { SocialOsOverview } from "@/app/social-os-ui";
 import { requireAdminPage } from "@/lib/auth";
 import { getEditorialStatus, type EditorialStatus } from "@/lib/editorial-store";
 import { getGroqConfigStatus } from "@/lib/groq";
 import { getPexelsConfigStatus } from "@/lib/pexels";
+import { getSocialOsStatus } from "@/lib/social-os/foundation-store";
 import type { SocialAccount, ZernioPost } from "@/lib/types";
 import {
   getReadableZernioError,
@@ -72,7 +79,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     load(listSupportedAccounts()),
     load(listPosts({ limit: 50 })),
   ]);
-  const editorialResult = await load(getEditorialStatus());
+  const [editorialResult, socialOsResult] = await Promise.all([
+    load(getEditorialStatus()),
+    load(getSocialOsStatus()),
+  ]);
 
   const accounts = accountsResult.ok ? accountsResult.data.accounts : [];
   const posts = postsResult.ok ? postsResult.data.posts : [];
@@ -108,46 +118,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
       <div className="min-w-0 px-5 py-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-6">
-          <header
-            id="home"
-            className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] shadow-2xl shadow-black/20 backdrop-blur"
-          >
-            <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr] lg:p-8">
-              <div>
-                <p className="mb-3 text-sm uppercase tracking-[0.28em] text-cyan-200/70">
-                  Social Studio
-                </p>
-                <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
-                  Crie conteúdo social com direção criativa.
-                </h1>
-                <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-300">
-                  Treine a marca, gere ideias, escolha os melhores ângulos,
-                  refine os criativos e publique no Instagram/LinkedIn pela
-                  Zernio.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <a
-                    href="/ideias"
-                    className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
-                  >
-                    Gerar ideias
-                  </a>
-                  <a
-                    href="/marca"
-                    className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    Ver marca
-                  </a>
-                </div>
-              </div>
-              <HomeActionPanel
-                status={editorialStatus}
-                stats={stats}
-                accounts={accounts.length}
-              />
-            </div>
-          </header>
-
           <StatusMessages
             params={params}
             zernioConfig={zernioConfig}
@@ -156,84 +126,37 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             editorialResult={editorialResult}
           />
 
-          <section className="grid gap-4 md:grid-cols-5">
-            <StatCard label="Ideias" value={editorialStatus.counts.contentIdeas} />
-            <StatCard label="Drafts" value={editorialStatus.counts.postDrafts} />
-            <StatCard label="Agendados" value={stats.scheduled} />
-            <StatCard label="Publicados" value={stats.published} />
-            <StatCard label="Falhas" value={stats.failed} tone="danger" />
-          </section>
+          {!socialOsResult.ok ? (
+            <Banner tone="error">
+              Nao consegui acessar a fundacao Social OS: {socialOsResult.error}
+            </Banner>
+          ) : null}
 
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-white">
-                Fluxo de produção
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
-                A Home agora é o cockpit. Cada etapa operacional abre em uma
-                página própria para evitar o painel infinito e deixar claro o
-                que fazer em seguida.
-              </p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <a
-                href="/marca"
-                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  1. Treinar marca
-                </p>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Logos, design system, assets, referências e análise.
-                </p>
-              </a>
-              <a
-                href="/ideias"
-                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  2. Curar ideias
-                </p>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Gerar ângulos, aprovar o que tem força e descartar ruído.
-                </p>
-              </a>
-              <a
-                href="/criacao"
-                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  3. Revisar criativos
-                </p>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Previews, copy, mídia sugerida e direção visual.
-                </p>
-              </a>
-              <a
-                href="/publicacao"
-                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  4. Publicar
-                </p>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Criar rascunho final, agendar ou publicar pela Zernio.
-                </p>
-              </a>
-              <a
-                href="/sistema"
-                className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10"
-              >
-                <p className="text-sm font-semibold text-white">
-                  5. Monitorar
-                </p>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Webhooks, posts sincronizados, falhas e operação.
-                </p>
-              </a>
-            </div>
-          </section>
+          <SocialOsOverview
+            status={
+              socialOsResult.ok
+                ? socialOsResult.data
+                : {
+                    configured: false,
+                    migrationReady: false,
+                    errors: [socialOsResult.error],
+                    counts: {},
+                    legacyCounts: {},
+                    recentDecisionTraces: [],
+                  }
+            }
+            legacy={{
+              ideas: editorialStatus.counts.contentIdeas,
+              drafts: editorialStatus.counts.postDrafts,
+              brandAssets: editorialStatus.counts.brandAssets,
+              zernioEvents: editorialStatus.counts.zernioEvents,
+              scheduledPosts: stats.scheduled,
+              accounts: accounts.length,
+            }}
+            groqReady={groqConfig.hasApiKey}
+            pexelsReady={pexelsConfig.hasApiKey}
+            zernioReady={zernioConfig.hasApiKey}
+          />
         </div>
       </div>
     </main>
@@ -263,11 +186,17 @@ export function getStats(posts: ZernioPost[]) {
 
 export function StudioSidebar() {
   const items = [
-    ["Home", "/"],
-    ["Marca", "/marca"],
-    ["Ideias", "/ideias"],
-    ["Criação", "/criacao"],
-    ["Publicação", "/publicacao"],
+    ["Cockpit", "/"],
+    ["Estrategia", "/estrategia"],
+    ["Campanhas", "/campanhas"],
+    ["Conceitos", "/conceitos"],
+    ["Producao", "/producao"],
+    ["Engajamento", "/engajamento"],
+    ["Aprendizado", "/aprendizado"],
+    ["Marca legado", "/marca"],
+    ["Ideias legado", "/ideias"],
+    ["Criacao legado", "/criacao"],
+    ["Publicacao", "/publicacao"],
     ["Sistema", "/sistema"],
   ];
 
@@ -275,41 +204,44 @@ export function StudioSidebar() {
     <aside className="border-b border-white/10 bg-black/35 px-5 py-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:px-6">
       <div className="flex items-center justify-between gap-4 lg:block">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
-            Social Studio
+          <p className="text-xs uppercase tracking-[0.2em] text-teal-200/80">
+            Social OS
           </p>
-          <h2 className="mt-2 text-xl font-semibold text-white">Falay</h2>
+          <h2 className="mt-2 text-xl font-semibold text-white">Creative Ops</h2>
         </div>
         <form action={logoutAction} className="lg:mt-8">
-          <button
+          <PendingSubmitButton
             type="submit"
-            className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            pendingLabel="Saindo"
           >
             Sair
-          </button>
+          </PendingSubmitButton>
         </form>
       </div>
 
       <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-8 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
         {items.map(([label, href]) => (
-          <a
+          <AppLink
             key={href}
             href={href}
-            className="whitespace-nowrap rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-cyan-100 lg:flex"
+            pendingLabel={`Abrindo ${label}`}
+            activeClassName="border-teal-300/30 bg-teal-300/10 text-teal-100"
+            className="whitespace-nowrap rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:border-teal-300/30 hover:bg-teal-300/10 hover:text-teal-100 lg:flex"
           >
             {label}
-          </a>
+          </AppLink>
         ))}
       </nav>
 
-      <div className="mt-8 hidden rounded-3xl border border-white/10 bg-white/[0.04] p-4 lg:block">
-        <p className="text-sm font-semibold text-white">Fluxo recomendado</p>
+      <div className="mt-8 hidden rounded-lg border border-white/10 bg-white/[0.04] p-4 lg:block">
+        <p className="text-sm font-semibold text-white">Novo fluxo</p>
         <ol className="mt-3 space-y-2 text-sm leading-6 text-zinc-400">
-          <li>1. Treinar marca</li>
-          <li>2. Gerar ideias</li>
-          <li>3. Aprovar ângulos</li>
-          <li>4. Criar previews</li>
-          <li>5. Publicar</li>
+          <li>1. Estrategia</li>
+          <li>2. Campanha</li>
+          <li>3. Conceito</li>
+          <li>4. Variante</li>
+          <li>5. Render e Zernio</li>
         </ol>
       </div>
     </aside>
@@ -354,14 +286,15 @@ export function HomeActionPanel({
       <p className="mb-4 text-sm font-semibold text-white">Próximas ações</p>
       <div className="grid gap-3 sm:grid-cols-2">
         {actions.map((action) => (
-          <a
+          <AppLink
             key={action.label}
             href={action.href}
+            pendingLabel={`Abrindo ${action.label}`}
             className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/10"
           >
             <p className="text-3xl font-semibold text-white">{action.value}</p>
             <p className="mt-2 text-sm text-zinc-400">{action.label}</p>
-          </a>
+          </AppLink>
         ))}
       </div>
       <a
@@ -567,6 +500,7 @@ export function CreatePostPanel({ accounts }: { accounts: SocialAccount[] }) {
           <SubmitButton intent="schedule" label="Agendar" />
           <SubmitButton intent="publish" label="Publicar agora" strong />
         </div>
+        <FormPendingNotice label="Enviando comando para a Zernio. Aguarde a confirmacao." />
       </form>
     </section>
   );
@@ -695,22 +629,22 @@ export function EditorialPanel({
 
       {showOverview ? (
       <div className="mt-6 grid gap-3 md:grid-cols-4">
-        <a href="/marca" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        <AppLink href="/marca" pendingLabel="Abrindo Marca" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">1. Base da marca</p>
           <p className="mt-1 text-xs text-zinc-500">Arquivos e links.</p>
-        </a>
-        <a href="/ideias" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        </AppLink>
+        <AppLink href="/ideias" pendingLabel="Abrindo Ideias" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">2. Gerar ideias</p>
           <p className="mt-1 text-xs text-zinc-500">Briefing → curadoria.</p>
-        </a>
-        <a href="/criacao" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        </AppLink>
+        <AppLink href="/criacao" pendingLabel="Abrindo Criacao" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">3. Criar posts</p>
           <p className="mt-1 text-xs text-zinc-500">Drafts e previews.</p>
-        </a>
-        <a href="/sistema" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
+        </AppLink>
+        <AppLink href="/sistema" pendingLabel="Abrindo Sistema" className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:bg-white/10">
           <p className="text-sm font-semibold text-white">4. Publicação</p>
           <p className="mt-1 text-xs text-zinc-500">Eventos Zernio.</p>
-        </a>
+        </AppLink>
       </div>
       ) : null}
 
@@ -735,13 +669,15 @@ export function EditorialPanel({
               <BrandKnowledgeOverview knowledge={status.latestBrandKnowledge} />
             </div>
             <form action={buildBrandKnowledgeAction}>
-              <button
+              <PendingSubmitButton
                 type="submit"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                pendingLabel="Analisando marca"
               >
                 <Sparkles className="size-4" />
                 Analisar marca
-              </button>
+              </PendingSubmitButton>
+              <FormPendingNotice label="Analisando arquivos e referencias da marca." />
             </form>
           </div>
         </div>
@@ -819,13 +755,15 @@ export function EditorialPanel({
             </Field>
           </div>
 
-          <button
+          <PendingSubmitButton
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            pendingLabel="Subindo asset"
           >
             <Upload className="size-4" />
             Subir asset da marca
-          </button>
+          </PendingSubmitButton>
+          <FormPendingNotice label="Subindo e registrando o asset da marca." />
         </form>
 
         <form
@@ -888,13 +826,15 @@ export function EditorialPanel({
             </Field>
           </div>
 
-          <button
+          <PendingSubmitButton
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/20 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+            pendingLabel="Salvando link"
           >
             <BookOpen className="size-4" />
             Salvar link de referência
-          </button>
+          </PendingSubmitButton>
+          <FormPendingNotice label="Salvando referencia da marca." />
         </form>
         </div>
 
@@ -921,13 +861,14 @@ export function EditorialPanel({
                 </p>
                 <form action={deleteBrandAssetAction} className="mt-4">
                   <input type="hidden" name="assetId" value={asset.id} />
-                  <button
+                  <PendingSubmitButton
                     type="submit"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                    pendingLabel="Deletando"
                   >
                     <Trash2 className="size-3.5" />
                     Deletar
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               </article>
             ))}
@@ -966,13 +907,14 @@ export function EditorialPanel({
                 </a>
                 <form action={deleteBrandReferenceAction} className="mt-4">
                   <input type="hidden" name="referenceId" value={reference.id} />
-                  <button
+                  <PendingSubmitButton
                     type="submit"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                    pendingLabel="Deletando"
                   >
                     <Trash2 className="size-3.5" />
                     Deletar
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               </article>
             ))}
@@ -1046,13 +988,15 @@ export function EditorialPanel({
               className="input"
             />
           </Field>
-          <button
+          <PendingSubmitButton
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+            pendingLabel="Gerando ideias"
           >
             <Sparkles className="size-4" />
             Gerar ideias para revisar
-          </button>
+          </PendingSubmitButton>
+          <FormPendingNotice label="Gerando ideias. A resposta aparece assim que o motor terminar." />
         </form>
 
         <IdeasReviewPanel ideas={status.recentIdeas} />
@@ -1173,13 +1117,15 @@ export function EditorialPanel({
             </Field>
           </div>
 
-          <button
+          <PendingSubmitButton
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-100"
+            pendingLabel="Gerando calendario"
           >
             <Sparkles className="size-4" />
             Gerar calendário e drafts
-          </button>
+          </PendingSubmitButton>
+          <FormPendingNotice label="Gerando calendario e drafts. Isso pode levar alguns segundos." />
         </form>
       </div>
       ) : null}
@@ -1510,12 +1456,13 @@ function DraftPreviewCard({
               </p>
               <form action={clearDraftMediaAction}>
                 <input type="hidden" name="draftId" value={draft.id} />
-                <button
+                <PendingSubmitButton
                   type="submit"
                   className="rounded-full border border-red-400/20 px-2.5 py-1 text-[11px] font-semibold text-red-100 transition hover:bg-red-500/10"
+                  pendingLabel="Removendo"
                 >
                   Remover imagem
-                </button>
+                </PendingSubmitButton>
               </form>
             </div>
             <a
@@ -1596,12 +1543,13 @@ function ApprovedIdeasForCreation({
             ) : (
               <form action={createDraftFromIdeaAction} className="mt-4">
                 <input type="hidden" name="ideaId" value={idea.id} />
-                <button
+                <PendingSubmitButton
                   type="submit"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                  pendingLabel="Criando draft"
                 >
                   Criar draft desta ideia
-                </button>
+                </PendingSubmitButton>
               </form>
             )}
           </article>
@@ -1750,45 +1698,49 @@ function IdeasReviewPanel({
                     className="input"
                   />
                 </Field>
-                <button
+                <PendingSubmitButton
                   type="submit"
                   className="inline-flex items-center justify-center rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/10"
+                  pendingLabel="Salvando"
                 >
                   Salvar edição do prompt
-                </button>
+                </PendingSubmitButton>
               </form>
 
               <div className="mt-5 grid gap-2 sm:grid-cols-3">
                 <form action={updateContentIdeaStatusAction}>
                   <input type="hidden" name="ideaId" value={idea.id} />
-                  <button
+                  <PendingSubmitButton
                     type="submit"
                     name="intent"
                     value="approve"
                     className="inline-flex w-full items-center justify-center rounded-xl bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-100"
+                    pendingLabel="Aprovando"
                   >
                     Aprovar ideia
-                  </button>
+                  </PendingSubmitButton>
                 </form>
                 <form action={updateContentIdeaStatusAction}>
                   <input type="hidden" name="ideaId" value={idea.id} />
-                  <button
+                  <PendingSubmitButton
                     type="submit"
                     name="intent"
                     value="reject"
                     className="inline-flex w-full items-center justify-center rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                    pendingLabel="Descartando"
                   >
                     Descartar
-                  </button>
+                  </PendingSubmitButton>
                 </form>
                 <form action={deleteContentIdeaAction}>
                   <input type="hidden" name="ideaId" value={idea.id} />
-                  <button
+                  <PendingSubmitButton
                     type="submit"
                     className="inline-flex w-full items-center justify-center rounded-xl border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+                    pendingLabel="Deletando"
                   >
                     Deletar ideia
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               </div>
             </article>
@@ -1884,24 +1836,26 @@ function PostRow({ post }: { post: ZernioPost }) {
               value={post.timezone || "America/Sao_Paulo"}
             />
             <div className="grid grid-cols-2 gap-2">
-              <button
+              <PendingSubmitButton
                 type="submit"
                 name="intent"
                 value="schedule"
                 className="action-button"
+                pendingLabel="Agendando"
               >
                 <CalendarClock className="size-3.5" />
                 Agendar
-              </button>
-              <button
+              </PendingSubmitButton>
+              <PendingSubmitButton
                 type="submit"
                 name="intent"
                 value="publish"
                 className="action-button"
+                pendingLabel="Publicando"
               >
                 <Send className="size-3.5" />
                 Publicar
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
         ) : null}
@@ -1909,15 +1863,16 @@ function PostRow({ post }: { post: ZernioPost }) {
         {canDelete ? (
           <form action={updateExistingPostAction}>
             <input type="hidden" name="postId" value={post._id} />
-            <button
+            <PendingSubmitButton
               type="submit"
               name="intent"
               value="delete"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/10"
+              pendingLabel="Removendo"
             >
               <Trash2 className="size-3.5" />
               Remover
-            </button>
+            </PendingSubmitButton>
           </form>
         ) : null}
       </div>
@@ -1935,18 +1890,25 @@ function SubmitButton({
   strong?: boolean;
 }) {
   return (
-    <button
+    <PendingSubmitButton
       type="submit"
       name="intent"
       value={intent}
-      className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+      pendingLabel={
+        intent === "publish"
+          ? "Publicando"
+          : intent === "schedule"
+            ? "Agendando"
+            : "Salvando"
+      }
+      className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
         strong
           ? "bg-white text-zinc-950 hover:bg-cyan-100"
           : "border border-white/10 text-white hover:bg-white/10"
       }`}
     >
       {label}
-    </button>
+    </PendingSubmitButton>
   );
 }
 

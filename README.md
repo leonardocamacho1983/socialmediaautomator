@@ -1,8 +1,10 @@
-# Social Media Automator
+# Social Creative OS
 
-Painel Next.js para criar rascunhos, aprovar, agendar e publicar posts no Instagram e LinkedIn usando a API da Zernio.
+Sistema interno Next.js para inteligencia editorial, producao criativa, publicacao e engajamento social, com foco inicial em Instagram e integracao Zernio.
 
-Também inclui a fundação de persistência no Supabase para calendário editorial, drafts gerados, assets de mídia e histórico de webhooks.
+A reconstrucao controlada comecou em 2026-07-30 na branch `rebuild/creative-os-phase-1`. A versao funcional anterior foi preservada na branch local `backup/pre-creative-os-rebuild-20260730`.
+
+O plano completo de inventario, migracao, nova arquitetura, riscos e backlog esta em `docs/architecture/rebuild-plan.md`.
 
 ## Variáveis
 
@@ -37,19 +39,27 @@ Se o app local redirecionar para `/setup`, falta `ADMIN_PASSWORD` no `.env.local
 Em produção, as páginas internas devem redirecionar para `/login` quando não há
 sessão ativa.
 
-## Páginas do Studio
+## Páginas do Social Creative OS
 
-O app usa páginas reais, não um dashboard único com âncoras:
+Novas rotas da arquitetura:
 
-- `/` — cockpit com métricas e próximas ações
-- `/marca` — assets, links, design system e análise da marca
-- `/ideias` — geração e curadoria de ideias
-- `/criacao` — previews e drafts gerados
-- `/publicacao` — criação manual, agendamento e publicação via Zernio
-- `/sistema` — webhooks, posts sincronizados e operação técnica
+- `/` - cockpit Social Creative OS
+- `/estrategia` - Business Profile, Brand DNA, perfil de escrita, audiencia e estrategia
+- `/campanhas` - campanhas, narrativas, funil, hipoteses e decision policy
+- `/conceitos` - creative concepts, creative pieces, variants e quality gates
+- `/producao` - visual grammar, layout spec, rendering jobs e rendered assets
+- `/engajamento` - comentarios, DMs, keyword-to-DM, contatos, conversas e escalonamento
+- `/aprendizado` - performance, insights e learning loop
 
-O fluxo recomendado é: treinar marca → gerar ideias → aprovar ângulos → revisar
-criativos → publicar → monitorar eventos.
+Rotas legadas preservadas:
+
+- `/marca` - assets, links, design system e analise da marca
+- `/ideias` - geracao e curadoria de ideias legadas
+- `/criacao` - previews e drafts legados
+- `/publicacao` - criacao manual, agendamento e publicacao via Zernio
+- `/sistema` - webhooks, posts sincronizados e operacao tecnica
+
+O fluxo novo e: estrategia -> campanha -> conceito criativo -> variante -> renderizacao -> publicacao -> engajamento -> aprendizado.
 
 ## Zernio
 
@@ -71,7 +81,7 @@ Se configurar `ZERNIO_WEBHOOK_SECRET`, o app valida `X-Zernio-Signature` com HMA
 
 ## Supabase
 
-Schema aplicado:
+Schema legado preservado:
 
 - `brand_profiles`
 - `personas`
@@ -83,11 +93,39 @@ Schema aplicado:
 - `generation_runs`
 - `zernio_events`
 
+Schema novo da fase 1:
+
+- `business_profiles`
+- `brand_dna`
+- `brand_writing_profiles`
+- `brand_visual_systems`
+- `audience_segments`
+- `content_strategies`
+- `campaigns`
+- `creative_concepts`
+- `creative_pieces`
+- `creative_variants`
+- `copy_evaluations`
+- `creative_evaluations`
+- `rendering_jobs`
+- `rendered_assets`
+- `publication_jobs`
+- `engagement_policies`
+- `contacts`
+- `conversations`
+- `social_interactions`
+- `engagement_actions`
+- `content_performance`
+- `learning_insights`
+- `decision_traces`
+
 Todas as tabelas têm RLS habilitado. O app acessa o banco apenas no servidor via `SUPABASE_SERVICE_ROLE_KEY`.
 
 Endpoint interno:
 
 - `GET /api/editorial/status`
+
+O cockpit novo usa leitura server-side de status via `lib/social-os/foundation-store.ts`.
 
 ## Gerador editorial
 
@@ -157,3 +195,24 @@ Essa análise:
 - injeta esse resumo no prompt do gerador editorial
 
 Sem essa etapa, o gerador usa apenas o campo manual "Design system / tom visual".
+
+## Fase 1: motores internos
+
+A primeira fase adiciona modulos separados em `lib/social-os/`:
+
+- `decision-policy.ts` - decisao de formato, estilo de copy, CTA, automacao e revisao humana
+- `human-writing.ts` - detector de padroes artificiais e prompt de reescrita adversarial
+- `creative-direction.ts` - creative concept seed e contrato de direcao criativa
+- `visual-grammar.ts` - gramaticas visuais e layout spec
+- `engagement-policy.ts` - classificacao inicial de comentarios e preparacao de acoes
+- `rendering.ts` - plano de renderizacao server-side sem Open Design
+- `foundation-store.ts` - status e bootstrap da fundacao no Supabase
+
+## Validacao local
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
