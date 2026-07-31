@@ -62,7 +62,10 @@ Authentication is handled by either:
 AI_GATEWAY_API_KEY
 ```
 
-or Vercel OIDC in deployment.
+or the Vercel runtime authentication path in deployment. A Shared Environment
+Variable can exist at account level without appearing as a project-level
+environment variable; the definitive validation is a successful
+`POST /api/concepts` call.
 
 ## Local Persistence
 
