@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { TypographicPieceWorkshop } from "./typographic-piece-workshop";
 import {
   BRAND_PROFILE_STORAGE_KEY,
   emptyBrandProfile,
@@ -23,6 +24,10 @@ import {
   compactBrandProfileForGeneration,
   compactBriefingForGeneration,
 } from "../../lib/creative/context";
+import {
+  createTypographicPiece,
+  type TypographicVariantId,
+} from "../../lib/creative/typographic-piece";
 
 const objectiveOptions = Object.entries(objectiveLabels) as Array<
   [CreativeBriefing["objective"], string]
@@ -50,7 +55,6 @@ export function ConceptGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState("Carregando perfil de marca.");
   const [error, setError] = useState("");
-  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     const storedBrand = window.localStorage.getItem(BRAND_PROFILE_STORAGE_KEY);
@@ -101,26 +105,23 @@ export function ConceptGenerator() {
     );
   }, [project]);
 
-  const selectedProductionContract = useMemo(() => {
-    if (!project || !selectedConcept) {
-      return null;
-    }
+  const activeBrandProfile = useMemo(
+    () => brandProfile || project?.brandSnapshot || emptyBrandProfile,
+    [brandProfile, project?.brandSnapshot],
+  );
 
-    return {
-      milestone: "marco-3-first-typographic-post",
-      nextStep:
-        "Transformar o conceito escolhido em uma peca tipografica 1080x1350.",
-      brandName: project.brandSnapshot.brandName,
-      briefing: project.briefing,
-      selectedConcept,
-      productionTargets: {
-        firstOutput: "post tipografico 1080x1350",
-        visualCopy: "headline, apoio e CTA visual",
-        layout: "3 variacoes de composicao",
-        export: "preview e PNG final",
-      },
-    };
-  }, [project, selectedConcept]);
+  const activeTypographicPiece =
+    project?.typographicPiece?.conceptId === selectedConcept?.id
+      ? project?.typographicPiece
+      : null;
+
+  function persistProject(nextProject: CreativeProject) {
+    window.localStorage.setItem(
+      CREATIVE_PROJECT_STORAGE_KEY,
+      JSON.stringify(nextProject),
+    );
+    setProject(nextProject);
+  }
 
   function updateBriefing<K extends keyof CreativeBriefing>(
     key: K,
@@ -180,11 +181,7 @@ export function ConceptGenerator() {
         generationBriefing,
         payload as CreativeConceptBatch,
       );
-      window.localStorage.setItem(
-        CREATIVE_PROJECT_STORAGE_KEY,
-        JSON.stringify(nextProject),
-      );
-      setProject(nextProject);
+      persistProject(nextProject);
       setStatus("Conceitos gerados e salvos neste navegador.");
     } catch (caughtError) {
       setError(
@@ -206,32 +203,54 @@ export function ConceptGenerator() {
     const nextProject: CreativeProject = {
       ...project,
       selectedConceptId: concept.id,
+      typographicPiece:
+        project.typographicPiece?.conceptId === concept.id
+          ? project.typographicPiece
+          : null,
       updatedAt: new Date().toISOString(),
     };
-    window.localStorage.setItem(
-      CREATIVE_PROJECT_STORAGE_KEY,
-      JSON.stringify(nextProject),
-    );
-    setProject(nextProject);
-    setCopyStatus("");
+    persistProject(nextProject);
     setStatus(`Conceito escolhido: ${concept.title}`);
   }
 
-  async function copyProductionContract() {
-    if (!selectedProductionContract) {
+  function produceTypographicPiece() {
+    if (!project || !selectedConcept) {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(
-        JSON.stringify(selectedProductionContract, null, 2),
-      );
-      setCopyStatus("Contrato copiado.");
-      window.setTimeout(() => setCopyStatus(""), 2600);
-    } catch {
-      setCopyStatus("");
-      setError("Nao foi possivel copiar o contrato do conceito.");
+    const nextProject: CreativeProject = {
+      ...project,
+      typographicPiece: createTypographicPiece(
+        project,
+        selectedConcept,
+        activeBrandProfile,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Peca tipografica gerada para revisao.");
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("typographic-piece")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function selectTypographicVariant(variantId: TypographicVariantId) {
+    if (!project?.typographicPiece) {
+      return;
     }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      typographicPiece: {
+        ...project.typographicPiece,
+        selectedVariantId: variantId,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Variacao tipografica escolhida.");
   }
 
   return (
@@ -388,10 +407,15 @@ export function ConceptGenerator() {
             <p className="section-kicker">Proximo passo</p>
             {selectedConcept ? (
               <>
-                <h3>Pronto para Marco 3</h3>
+                <h3>
+                  {activeTypographicPiece
+                    ? "Marco 3 em revisao"
+                    : "Pronto para Marco 3"}
+                </h3>
                 <p>
-                  Produzir a primeira peca tipografica a partir deste conceito:
-                  copy visual, layout 1080x1350 e tres variacoes.
+                  {activeTypographicPiece
+                    ? "A peca tipografica ja esta pronta para comparar variacoes e baixar o PNG."
+                    : "Produzir a primeira peca tipografica a partir deste conceito: copy visual, layout 1080x1350 e tres variacoes."}
                 </p>
                 <dl className="next-step-list">
                   <div>
@@ -410,12 +434,16 @@ export function ConceptGenerator() {
                 <button
                   className="primary-button next-step-button"
                   type="button"
-                  onClick={copyProductionContract}
+                  onClick={produceTypographicPiece}
                 >
-                  Copiar contrato do Marco 3
+                  {activeTypographicPiece
+                    ? "Regenerar peca tipografica"
+                    : "Produzir peca tipografica"}
                 </button>
-                {copyStatus ? (
-                  <span className="next-step-status">{copyStatus}</span>
+                {activeTypographicPiece ? (
+                  <a className="secondary-button next-step-button" href="#typographic-piece">
+                    Ver peca tipografica
+                  </a>
                 ) : null}
               </>
             ) : (
@@ -431,6 +459,13 @@ export function ConceptGenerator() {
               project
                 ? {
                     selectedConceptId: project.selectedConceptId,
+                    typographicPiece: project.typographicPiece
+                      ? {
+                          id: project.typographicPiece.id,
+                          selectedVariantId:
+                            project.typographicPiece.selectedVariantId,
+                        }
+                      : null,
                     decisionTrace: project.batch.decisionTrace,
                   }
                 : {
@@ -514,6 +549,16 @@ export function ConceptGenerator() {
             })}
           </div>
         </section>
+      ) : null}
+
+      {project && selectedConcept ? (
+        <TypographicPieceWorkshop
+          brandProfile={activeBrandProfile}
+          project={project}
+          selectedConcept={selectedConcept}
+          onProduce={produceTypographicPiece}
+          onSelectVariant={selectTypographicVariant}
+        />
       ) : null}
     </main>
   );

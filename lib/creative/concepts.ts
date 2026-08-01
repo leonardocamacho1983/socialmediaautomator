@@ -1,4 +1,5 @@
 import type { BrandProfile } from "../brand/profile";
+import type { TypographicPiece } from "./typographic-piece";
 
 export const CREATIVE_PROJECT_STORAGE_KEY =
   "socialmediaautomator.creativeProject.v1";
@@ -66,6 +67,7 @@ export type CreativeProject = {
   briefing: CreativeBriefing;
   batch: CreativeConceptBatch;
   selectedConceptId: string | null;
+  typographicPiece?: TypographicPiece | null;
   updatedAt: string;
 };
 

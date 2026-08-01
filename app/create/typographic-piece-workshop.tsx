@@ -1,0 +1,258 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element -- previews use local SVG data URLs generated in the browser */
+
+import { useMemo, useState } from "react";
+import type { BrandProfile } from "../../lib/brand/profile";
+import type {
+  CreativeConcept,
+  CreativeProject,
+} from "../../lib/creative/concepts";
+import {
+  getSelectedTypographicVariant,
+  renderTypographicSvg,
+  svgToDataUrl,
+  TYPOGRAPHIC_POST_HEIGHT,
+  TYPOGRAPHIC_POST_WIDTH,
+  type TypographicVariantId,
+} from "../../lib/creative/typographic-piece";
+
+type TypographicPieceWorkshopProps = {
+  project: CreativeProject;
+  selectedConcept: CreativeConcept;
+  brandProfile: BrandProfile;
+  onProduce: () => void;
+  onSelectVariant: (variantId: TypographicVariantId) => void;
+};
+
+export function TypographicPieceWorkshop({
+  project,
+  selectedConcept,
+  brandProfile,
+  onProduce,
+  onSelectVariant,
+}: TypographicPieceWorkshopProps) {
+  const [exportStatus, setExportStatus] = useState("");
+  const piece =
+    project.typographicPiece?.conceptId === selectedConcept.id
+      ? project.typographicPiece
+      : null;
+  const selectedVariant = piece ? getSelectedTypographicVariant(piece) : null;
+  const selectedSvg = useMemo(() => {
+    if (!piece || !selectedVariant) {
+      return "";
+    }
+
+    return renderTypographicSvg(piece, selectedVariant, brandProfile);
+  }, [brandProfile, piece, selectedVariant]);
+  const selectedDataUrl = selectedSvg ? svgToDataUrl(selectedSvg) : "";
+  const variantPreviews = useMemo(() => {
+    if (!piece) {
+      return [];
+    }
+
+    return piece.variants.map((variant) => {
+      const svg = renderTypographicSvg(piece, variant, brandProfile);
+
+      return {
+        variant,
+        dataUrl: svgToDataUrl(svg),
+      };
+    });
+  }, [brandProfile, piece]);
+
+  async function downloadSelectedPng() {
+    if (!piece || !selectedVariant || !selectedSvg) {
+      return;
+    }
+
+    setExportStatus("Gerando PNG...");
+
+    try {
+      await downloadSvgAsPng(
+        selectedSvg,
+        `${slugify(brandProfile.brandName || "social-studio")}-${selectedVariant.id}.png`,
+      );
+      setExportStatus("PNG pronto.");
+      window.setTimeout(() => setExportStatus(""), 2600);
+    } catch {
+      setExportStatus("Nao foi possivel baixar o PNG.");
+    }
+  }
+
+  return (
+    <section
+      className="typographic-workshop"
+      id="typographic-piece"
+      aria-labelledby="typographic-title"
+    >
+      <div className="section-heading">
+        <p className="section-kicker">Marco 3</p>
+        <h2 id="typographic-title">Primeira peca tipografica</h2>
+      </div>
+
+      {!piece ? (
+        <div className="typographic-empty">
+          <div>
+            <strong>{selectedConcept.title}</strong>
+            <p>
+              Produza uma peca 1080x1350 usando apenas copy, hierarquia,
+              contraste, cor e marca. Sem imagem, sem Recraft e sem carrossel.
+            </p>
+          </div>
+          <button className="primary-button" type="button" onClick={onProduce}>
+            Produzir peca tipografica
+          </button>
+        </div>
+      ) : (
+        <div className="typographic-layout">
+          <div className="typographic-preview-panel">
+            <div className="typographic-canvas-frame">
+              <img
+                alt={`Preview da variacao ${selectedVariant?.name || ""}`}
+                className="typographic-preview-image"
+                height={TYPOGRAPHIC_POST_HEIGHT}
+                src={selectedDataUrl}
+                width={TYPOGRAPHIC_POST_WIDTH}
+              />
+            </div>
+
+            <div className="typographic-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={downloadSelectedPng}
+              >
+                Baixar PNG
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={onProduce}
+              >
+                Regenerar peca
+              </button>
+              {exportStatus ? (
+                <span className="next-step-status" role="status">
+                  {exportStatus}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <aside className="typographic-control-panel">
+            <div className="summary-block">
+              <p className="section-kicker">Copy visual</p>
+              <dl className="typographic-copy-list">
+                <div>
+                  <dt>Headline</dt>
+                  <dd>{piece.copy.headline}</dd>
+                </div>
+                <div>
+                  <dt>Apoio</dt>
+                  <dd>{piece.copy.support}</dd>
+                </div>
+                <div>
+                  <dt>CTA visual</dt>
+                  <dd>{piece.copy.cta}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="summary-block">
+              <p className="section-kicker">Variacoes</p>
+              <div className="typographic-variant-grid">
+                {variantPreviews.map(({ variant, dataUrl }) => {
+                  const isSelected = variant.id === piece.selectedVariantId;
+
+                  return (
+                    <button
+                      className={
+                        isSelected
+                          ? "typographic-variant typographic-variant-selected"
+                          : "typographic-variant"
+                      }
+                      key={variant.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => onSelectVariant(variant.id)}
+                    >
+                      <img
+                        alt=""
+                        height={TYPOGRAPHIC_POST_HEIGHT}
+                        src={dataUrl}
+                        width={TYPOGRAPHIC_POST_WIDTH}
+                      />
+                      <strong>{variant.name}</strong>
+                      <span>{variant.rationale}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+    </section>
+  );
+}
+
+async function downloadSvgAsPng(svg: string, fileName: string) {
+  const svgBlob = new Blob([svg], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  try {
+    const image = new Image();
+    image.decoding = "async";
+
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Image load failed"));
+      image.src = svgUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = TYPOGRAPHIC_POST_WIDTH;
+    canvas.height = TYPOGRAPHIC_POST_HEIGHT;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas unavailable");
+    }
+
+    context.drawImage(image, 0, 0, TYPOGRAPHIC_POST_WIDTH, TYPOGRAPHIC_POST_HEIGHT);
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+
+        reject(new Error("PNG export failed"));
+      }, "image/png");
+    });
+    const pngUrl = URL.createObjectURL(pngBlob);
+    const link = document.createElement("a");
+    link.href = pngUrl;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(pngUrl);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+function slugify(value: string) {
+  return value
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}

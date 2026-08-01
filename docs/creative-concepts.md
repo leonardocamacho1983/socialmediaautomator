@@ -25,7 +25,6 @@ Not included:
 
 - final copy;
 - rendered assets;
-- Marco 3 production workflow;
 - Recraft or image generation;
 - Supabase persistence;
 - Zernio;
@@ -35,6 +34,9 @@ Not included:
 - multiple brands or users.
 
 ## AI Gateway
+
+The next typographic production step is documented in
+`docs/typographic-post.md`.
 
 The API route is:
 

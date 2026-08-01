@@ -12,7 +12,7 @@ export function GET() {
   return Response.json({
     status: "ok",
     service: "socialmediaautomator",
-    milestone: "marco-2-creative-concepts",
+    milestone: "marco-3-typographic-post",
     productFeaturesEnabled: true,
     aiGatewayConfigured: staticGatewayKeyPresent || vercelRuntimePresent,
     aiGatewayAuth: {

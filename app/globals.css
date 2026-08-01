@@ -551,6 +551,166 @@ h2 {
   line-height: 1.45;
 }
 
+.typographic-workshop {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: clamp(20px, 3vw, 32px);
+  scroll-margin-top: 24px;
+}
+
+.typographic-empty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, #ffffff);
+  padding: 20px;
+}
+
+.typographic-empty strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.15rem;
+}
+
+.typographic-empty p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.typographic-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 22px;
+  align-items: start;
+}
+
+.typographic-preview-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.typographic-canvas-frame {
+  display: grid;
+  min-height: 640px;
+  place-items: center;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 36%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--border) 36%, transparent) 1px, transparent 1px),
+    var(--surface-muted);
+  background-size: 28px 28px;
+  padding: 20px;
+}
+
+.typographic-preview-image {
+  width: min(100%, 480px);
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid color-mix(in srgb, var(--foreground) 18%, transparent);
+  background: #ffffff;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+.typographic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.typographic-control-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.typographic-copy-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.typographic-copy-list div {
+  display: grid;
+  gap: 5px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.typographic-copy-list dt {
+  color: var(--foreground);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.typographic-copy-list dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.typographic-variant-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.typographic-variant {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px 12px;
+  width: 100%;
+  align-items: start;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+}
+
+.typographic-variant:hover,
+.typographic-variant:focus-visible {
+  border-color: var(--accent);
+}
+
+.typographic-variant:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.typographic-variant-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.typographic-variant img {
+  grid-row: 1 / span 2;
+  width: 92px;
+  height: 115px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.typographic-variant strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.typographic-variant span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -576,6 +736,15 @@ h2 {
 
   .concept-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .typographic-layout,
+  .typographic-empty {
+    grid-template-columns: 1fr;
+  }
+
+  .typographic-canvas-frame {
+    min-height: 520px;
   }
 }
 
