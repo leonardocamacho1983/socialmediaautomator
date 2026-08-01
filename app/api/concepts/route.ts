@@ -1,10 +1,8 @@
 import {
   APICallError,
-  generateText,
+  generateObject,
   gateway,
-  NoOutputGeneratedError,
   NoObjectGeneratedError,
-  Output,
   TypeValidationError,
 } from "ai";
 import { z } from "zod";
@@ -22,6 +20,22 @@ import { buildCreativeConceptPrompt } from "../../../lib/creative/prompts";
 export const dynamic = "force-dynamic";
 
 const MAX_REQUEST_BODY_CHARS = 240_000;
+const textField = z.string().min(1).catch("");
+const textList = z.array(z.string().min(1)).catch([]);
+
+function extractJsonObject(text: string) {
+  const trimmedText = text.trim();
+  const fencedJson = trimmedText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedJson?.[1] || trimmedText;
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+
+  return candidate.slice(firstBrace, lastBrace + 1);
+}
 
 const brandProfileSchema = z.object({
   brandName: z.string(),
@@ -65,34 +79,49 @@ const conceptOutputSchema = z.object({
   concepts: z
     .array(
       z.object({
-        title: z.string().min(3),
-        centralIdea: z.string().min(10),
-        hook: z.string().min(6),
-        recommendedFormat: z.string().min(3),
-        estimatedSlides: z.number().int().min(1).max(10),
-        narrativeStructure: z.array(z.string().min(3)).min(3).max(7),
+        title: textField,
+        centralIdea: textField,
+        hook: textField,
+        recommendedFormat: textField,
+        estimatedSlides: z.coerce.number().int().min(1).max(10).catch(1),
+        narrativeStructure: z.array(z.string().min(1)).min(1).max(8).catch([]),
         visualDirection: z.object({
-          visualFamily: z.string().min(3),
-          composition: z.string().min(6),
-          typography: z.string().min(6),
-          colorUsage: z.string().min(6),
-          assetStrategy: z.string().min(6),
+          visualFamily: textField,
+          composition: textField,
+          typography: textField,
+          colorUsage: textField,
+          assetStrategy: textField,
+        }).catch({
+          visualFamily: "",
+          composition: "",
+          typography: "",
+          colorUsage: "",
+          assetStrategy: "",
         }),
         copyDirection: z.object({
-          style: z.string().min(3),
-          openingMove: z.string().min(6),
-          voiceNotes: z.string().min(6),
+          style: textField,
+          openingMove: textField,
+          voiceNotes: textField,
+        }).catch({
+          style: "",
+          openingMove: "",
+          voiceNotes: "",
         }),
-        whyItFitsBrand: z.string().min(10),
-        differentiationFromOthers: z.string().min(10),
-        riskNotes: z.string().min(3),
+        whyItFitsBrand: textField,
+        differentiationFromOthers: textField,
+        riskNotes: z.string().catch("Sem risco especifico apontado."),
       }),
     )
-    .length(3),
+    .min(3)
+    .max(5),
   decisionTrace: z.object({
-    brandSignals: z.array(z.string().min(3)).min(2).max(6),
-    briefingSignals: z.array(z.string().min(3)).min(2).max(6),
-    differentiationStrategy: z.string().min(12),
+    brandSignals: textList,
+    briefingSignals: textList,
+    differentiationStrategy: textField,
+  }).catch({
+    brandSignals: [],
+    briefingSignals: [],
+    differentiationStrategy: "",
   }),
 });
 
@@ -167,12 +196,14 @@ export async function POST(request: Request) {
   );
 
   try {
-    const result = await generateText({
+    const result = await generateObject({
       model: gateway(model),
       maxOutputTokens: 4200,
-      output: Output.object({
-        schema: conceptOutputSchema,
-      }),
+      schema: conceptOutputSchema,
+      schemaName: "CreativeConceptBatch",
+      schemaDescription:
+        "Exactly three distinct Instagram creative concept directions.",
+      repairText: async ({ text }) => extractJsonObject(text),
       providerOptions: {
         gateway: {
           tags: ["feature:creative-concepts", "milestone:marco-2"],
@@ -184,11 +215,11 @@ export async function POST(request: Request) {
     });
 
     const batch: CreativeConceptBatch = {
-      concepts: result.output.concepts.map((concept, index) => ({
+      concepts: result.object.concepts.slice(0, 3).map((concept, index) => ({
         ...concept,
         id: `concept-${index + 1}`,
       })),
-      decisionTrace: result.output.decisionTrace,
+      decisionTrace: result.object.decisionTrace,
       model,
       generatedAt: new Date().toISOString(),
     };
@@ -228,7 +259,6 @@ export async function POST(request: Request) {
 
     if (
       NoObjectGeneratedError.isInstance(error) ||
-      NoOutputGeneratedError.isInstance(error) ||
       TypeValidationError.isInstance(error)
     ) {
       return Response.json(
