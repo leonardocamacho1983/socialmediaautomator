@@ -2,8 +2,8 @@ import type { BrandProfile } from "../brand/profile";
 import type { CreativeBriefing, CreativeConcept } from "./concepts";
 import type { TypographicCopy, TypographicPiece } from "./typographic-piece";
 
-export const DEFAULT_CAPTION_MODEL = "openai/gpt-5.6-luna";
-export const DEFAULT_CAPTION_FALLBACK_MODEL = "anthropic/claude-sonnet-5";
+export const DEFAULT_CAPTION_MODEL = "anthropic/claude-sonnet-5";
+export const DEFAULT_CAPTION_FALLBACK_MODEL = "openai/gpt-5.4-mini";
 
 export type CaptionVariantId =
   | "short-dry"

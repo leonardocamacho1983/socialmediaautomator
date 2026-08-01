@@ -3,6 +3,8 @@ import {
   generateText,
   gateway,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
+  Output,
   TypeValidationError,
 } from "ai";
 import { z } from "zod";
@@ -11,6 +13,11 @@ import {
   buildCaptionPackage,
   DEFAULT_CAPTION_FALLBACK_MODEL,
   DEFAULT_CAPTION_MODEL,
+  reviewCaptionForInstagram,
+  type CaptionGenerationInput,
+  type CaptionVariant,
+  type CaptionVariantId,
+  type InstagramScore,
 } from "../../../lib/creative/captions";
 import {
   compactBrandProfileForGeneration,
@@ -22,8 +29,11 @@ export const dynamic = "force-dynamic";
 
 const MAX_REQUEST_BODY_CHARS = 240_000;
 const textField = z.string().min(1).catch("");
-const textList = z.array(z.string().min(1)).catch([]);
-const instagramScoreSchema = z.enum(["baixo", "medio", "alto"]);
+const captionVariantOrder: CaptionVariantId[] = [
+  "short-dry",
+  "conversation",
+  "strategic-context",
+];
 
 function extractJsonObject(text: string) {
   const trimmedText = text.trim();
@@ -51,7 +61,9 @@ function parseModelOutput(text: string) {
 
   try {
     const parsedJson: unknown = JSON.parse(jsonText);
-    const parsedOutput = captionOutputSchema.safeParse(parsedJson);
+    const parsedOutput = captionOutputSchema.safeParse(
+      Array.isArray(parsedJson) ? { variants: parsedJson } : parsedJson,
+    );
 
     if (!parsedOutput.success) {
       return {
@@ -183,29 +195,39 @@ const typographicPieceSchema = z.object({
   ]),
 });
 
-const captionVariantSchema = z.object({
-  id: z.enum(["short-dry", "conversation", "strategic-context"]),
-  label: textField,
-  strategicRole: textField,
-  caption: textField,
-  firstComment: z.string().catch(""),
-  hashtags: textList,
+const generatedScoreSchema = z
+  .string()
+  .describe("Use exactly one value: baixo, medio, or alto.");
+
+const generatedCaptionVariantSchema = z.object({
+  id: z
+    .string()
+    .describe("One of: short-dry, conversation, strategic-context."),
+  label: z.string().describe("Short user-facing label."),
+  strategicRole: z
+    .string()
+    .describe("The strategic reason for this caption variant."),
+  caption: z.string().describe("Instagram caption text."),
+  firstComment: z.string().describe("Suggested first comment."),
+  hashtags: z.array(z.string()).max(8).describe("Specific hashtags."),
   review: z.object({
-    sharePotential: instagramScoreSchema,
-    commentPotential: instagramScoreSchema,
-    savePotential: instagramScoreSchema,
-    openingClarity: instagramScoreSchema,
-    brandFit: instagramScoreSchema,
-    aiRisk: instagramScoreSchema,
-    promiseRisk: instagramScoreSchema,
-    rationale: textField,
-    improvementNotes: textList,
+    sharePotential: generatedScoreSchema,
+    commentPotential: generatedScoreSchema,
+    savePotential: generatedScoreSchema,
+    openingClarity: generatedScoreSchema,
+    brandFit: generatedScoreSchema,
+    aiRisk: generatedScoreSchema,
+    promiseRisk: generatedScoreSchema,
+    rationale: z.string().describe("Short strategic assessment."),
+    improvementNotes: z.array(z.string()).max(5),
   }),
 });
 
 const captionOutputSchema = z.object({
-  variants: z.array(captionVariantSchema).min(3).max(5),
+  variants: z.array(generatedCaptionVariantSchema).min(3).max(5),
 });
+
+type GeneratedCaptionOutput = z.infer<typeof captionOutputSchema>;
 
 const requestSchema = z.object({
   brandProfile: brandProfileSchema,
@@ -213,6 +235,214 @@ const requestSchema = z.object({
   selectedConcept: conceptSchema,
   typographicPiece: typographicPieceSchema,
 });
+
+function coerceCaptionVariants(
+  output: GeneratedCaptionOutput,
+  input: CaptionGenerationInput,
+): CaptionVariant[] {
+  const usedIds = new Set<CaptionVariantId>();
+
+  return output.variants.slice(0, 3).map((variant, index) => {
+    const id = uniqueCaptionVariantId(
+      normalizeCaptionVariantId(variant.id, index),
+      usedIds,
+      index,
+    );
+    const caption = compactRouteCaption(variant.caption, 2200);
+    const fallbackReview = reviewCaptionForInstagram(
+      caption,
+      input.typographicPiece.copy,
+      input.brandProfile,
+    );
+    const review = variant.review || {
+      rationale: "",
+      improvementNotes: [],
+    };
+
+    return {
+      id,
+      label: compactRouteText(variant.label || captionLabelForId(id), 80),
+      strategicRole: compactRouteText(variant.strategicRole, 280),
+      caption,
+      firstComment: compactRouteCaption(variant.firstComment || "", 280),
+      hashtags: normalizeHashtagList(variant.hashtags),
+      review: {
+        sharePotential: normalizeScore(
+          review.sharePotential,
+          fallbackReview.sharePotential,
+        ),
+        commentPotential: normalizeScore(
+          review.commentPotential,
+          fallbackReview.commentPotential,
+        ),
+        savePotential: normalizeScore(
+          review.savePotential,
+          fallbackReview.savePotential,
+        ),
+        openingClarity: normalizeScore(
+          review.openingClarity,
+          fallbackReview.openingClarity,
+        ),
+        brandFit: normalizeScore(review.brandFit, fallbackReview.brandFit),
+        aiRisk: normalizeScore(review.aiRisk, fallbackReview.aiRisk),
+        promiseRisk: normalizeScore(
+          review.promiseRisk,
+          fallbackReview.promiseRisk,
+        ),
+        rationale:
+          compactRouteText(review.rationale || "", 420) ||
+          fallbackReview.rationale,
+        improvementNotes: normalizeImprovementNotes(
+          review.improvementNotes,
+          fallbackReview.improvementNotes,
+        ),
+      },
+    };
+  });
+}
+
+function uniqueCaptionVariantId(
+  id: CaptionVariantId,
+  usedIds: Set<CaptionVariantId>,
+  index: number,
+) {
+  if (!usedIds.has(id)) {
+    usedIds.add(id);
+    return id;
+  }
+
+  const fallbackId =
+    captionVariantOrder.find((candidate) => !usedIds.has(candidate)) ||
+    captionVariantOrder[index] ||
+    "short-dry";
+  usedIds.add(fallbackId);
+  return fallbackId;
+}
+
+function normalizeCaptionVariantId(value: string, index: number): CaptionVariantId {
+  const normalized = normalizeLooseToken(value);
+
+  if (normalized.includes("short") || normalized.includes("curta")) {
+    return "short-dry";
+  }
+
+  if (
+    normalized.includes("conversation") ||
+    normalized.includes("conversa") ||
+    normalized.includes("comment")
+  ) {
+    return "conversation";
+  }
+
+  if (
+    normalized.includes("strategic") ||
+    normalized.includes("context") ||
+    normalized.includes("estrateg")
+  ) {
+    return "strategic-context";
+  }
+
+  return captionVariantOrder[index] || "short-dry";
+}
+
+function captionLabelForId(id: CaptionVariantId) {
+  if (id === "conversation") {
+    return "Conversa";
+  }
+
+  if (id === "strategic-context") {
+    return "Contexto estrategico";
+  }
+
+  return "Curta e seca";
+}
+
+function normalizeScore(value: string | undefined, fallback: InstagramScore) {
+  const normalized = normalizeLooseToken(value || "");
+
+  if (!normalized || normalized.includes("|")) {
+    return fallback;
+  }
+
+  if (
+    normalized.includes("alto") ||
+    normalized.includes("alta") ||
+    normalized.includes("high")
+  ) {
+    return "alto";
+  }
+
+  if (
+    normalized.includes("baixo") ||
+    normalized.includes("baixa") ||
+    normalized.includes("low")
+  ) {
+    return "baixo";
+  }
+
+  if (
+    normalized.includes("medio") ||
+    normalized.includes("media") ||
+    normalized.includes("medium")
+  ) {
+    return "medio";
+  }
+
+  return fallback;
+}
+
+function normalizeLooseToken(value: string) {
+  return value
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeHashtagList(value: string[]) {
+  return value
+    .flatMap((item) => item.split(/[\s,]+/))
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^#+/, "")
+        .replace(/[^\p{L}\p{N}_]/gu, ""),
+    )
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((item) => `#${item}`);
+}
+
+function normalizeImprovementNotes(value: string[], fallback: string[]) {
+  const notes = value.map((note) => compactRouteText(note, 180)).filter(Boolean);
+
+  return notes.length ? notes.slice(0, 5) : fallback.slice(0, 5);
+}
+
+function compactRouteText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function compactRouteCaption(value: string, maxLength: number) {
+  const normalized = value
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
 
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") || "0");
@@ -284,6 +514,12 @@ export async function POST(request: Request) {
     try {
       const result = await generateText({
         model: gateway(activeModel),
+        output: Output.object({
+          name: "InstagramCaptionPackage",
+          description:
+            "Three Instagram caption variants with first comment, hashtags, and review scores.",
+          schema: captionOutputSchema,
+        }),
         maxOutputTokens: 3600,
         providerOptions: {
           gateway: {
@@ -299,26 +535,42 @@ export async function POST(request: Request) {
         prompt,
       });
 
-      const parsedOutput = parseModelOutput(result.text);
-
-      if (!parsedOutput.success) {
-        console.error("Caption JSON parse failed", {
-          model: activeModel,
-          reason: parsedOutput.error,
-          promptChars: prompt.length,
-          textChars: result.text.length,
-        });
-        continue;
-      }
+      const variants = coerceCaptionVariants(result.output, generationInput);
 
       return Response.json(
         buildCaptionPackage(
           generationInput,
-          parsedOutput.data.variants.slice(0, 3),
+          variants,
           activeModel,
         ),
       );
     } catch (error) {
+      if (NoObjectGeneratedError.isInstance(error)) {
+        const parsedOutput = parseModelOutput(error.text || "");
+
+        if (parsedOutput.success) {
+          return Response.json(
+            buildCaptionPackage(
+              generationInput,
+              coerceCaptionVariants(parsedOutput.data, generationInput),
+              activeModel,
+            ),
+          );
+        }
+
+        console.error("Caption structured output failed", {
+          model: activeModel,
+          reason: parsedOutput.error,
+          cause:
+            error.cause instanceof Error
+              ? error.cause.message
+              : String(error.cause || ""),
+          promptChars: prompt.length,
+          textChars: error.text?.length || 0,
+        });
+        continue;
+      }
+
       console.error("Caption generation failed", {
         model: activeModel,
         name: error instanceof Error ? error.name : "UnknownError",
@@ -353,7 +605,7 @@ export async function POST(request: Request) {
 
       if (
         APICallError.isInstance(error) ||
-        NoObjectGeneratedError.isInstance(error) ||
+        NoOutputGeneratedError.isInstance(error) ||
         TypeValidationError.isInstance(error)
       ) {
         continue;

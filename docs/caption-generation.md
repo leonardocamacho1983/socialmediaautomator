@@ -53,13 +53,13 @@ generateText -> JSON extraction -> Zod validation -> caption package
 Default model:
 
 ```text
-openai/gpt-5.6-luna
+anthropic/claude-sonnet-5
 ```
 
 Fallback model:
 
 ```text
-anthropic/claude-sonnet-5
+openai/gpt-5.4-mini
 ```
 
 Override with:
