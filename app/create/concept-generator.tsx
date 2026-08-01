@@ -64,6 +64,10 @@ export function ConceptGenerator() {
   const [status, setStatus] = useState("Carregando perfil de marca.");
   const [error, setError] = useState("");
   const [captionError, setCaptionError] = useState("");
+  const [
+    typographicRegenerationInstruction,
+    setTypographicRegenerationInstruction,
+  ] = useState("");
   const [captionRegenerationInstruction, setCaptionRegenerationInstruction] =
     useState("");
 
@@ -244,6 +248,9 @@ export function ConceptGenerator() {
       project,
       selectedConcept,
       activeBrandProfile,
+      {
+        regenerationInstruction: typographicRegenerationInstruction,
+      },
     );
     const nextProject: CreativeProject = {
       ...project,
@@ -779,9 +786,11 @@ export function ConceptGenerator() {
         <TypographicPieceWorkshop
           brandProfile={activeBrandProfile}
           project={project}
+          regenerationInstruction={typographicRegenerationInstruction}
           selectedConcept={selectedConcept}
           onProduce={produceTypographicPiece}
           onUpdateCopy={updateTypographicCopy}
+          onUpdateRegenerationInstruction={setTypographicRegenerationInstruction}
           onSelectVariant={selectTypographicVariant}
         />
       ) : null}

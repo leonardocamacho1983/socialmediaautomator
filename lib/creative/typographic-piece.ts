@@ -35,6 +35,10 @@ export type TypographicPiece = {
   selectedVariantId: TypographicVariantId;
 };
 
+export type TypographicPieceGenerationOptions = {
+  regenerationInstruction?: string;
+};
+
 export const typographicVariants: TypographicVariant[] = [
   {
     id: "editorial-tension",
@@ -63,6 +67,7 @@ export function createTypographicPiece(
   project: CreativeProject,
   concept: CreativeConcept,
   brandProfile: BrandProfile,
+  options: TypographicPieceGenerationOptions = {},
 ): TypographicPiece {
   return {
     id: `typographic-${Date.now()}`,
@@ -72,9 +77,9 @@ export function createTypographicPiece(
       width: TYPOGRAPHIC_POST_WIDTH,
       height: TYPOGRAPHIC_POST_HEIGHT,
     },
-    copy: buildTypographicCopy(project, concept, brandProfile),
+    copy: buildTypographicCopy(project, concept, brandProfile, options),
     variants: typographicVariants,
-    selectedVariantId: "editorial-tension",
+    selectedVariantId: selectInitialVariant(concept, options),
   };
 }
 
@@ -112,13 +117,15 @@ function buildTypographicCopy(
   project: CreativeProject,
   concept: CreativeConcept,
   brandProfile: BrandProfile,
+  options: TypographicPieceGenerationOptions,
 ): TypographicCopy {
+  const instruction = normalizeInstruction(options.regenerationInstruction);
   const headline = trimForDisplay(
-    stripOuterQuotes(concept.hook || concept.title),
+    buildHeadline(project, concept, instruction),
     86,
   );
-  const support = buildSupportCopy(project, concept, headline);
-  const cta = buildObjectiveCta(project, brandProfile);
+  const support = buildSupportCopy(project, concept, headline, instruction);
+  const cta = buildObjectiveCta(project, brandProfile, instruction);
 
   return {
     headline,
@@ -127,7 +134,67 @@ function buildTypographicCopy(
   };
 }
 
-function buildObjectiveCta(project: CreativeProject, brandProfile: BrandProfile) {
+function buildHeadline(
+  project: CreativeProject,
+  concept: CreativeConcept,
+  instruction: string,
+) {
+  const source = buildTypographicSource(project, concept);
+
+  if (/\b(agressiv|provoc|tens[aã]o|urgent|duro|dor)\b/i.test(instruction)) {
+    if (/\b(14h|19h|hor[aá]rio)\b/i.test(source)) {
+      return "14h03. O cliente perguntou. 19h12. Já era.";
+    }
+
+    if (/\b(demor\w*|atras\w*|tarde|esfri\w*)\b/i.test(source)) {
+      return "A venda esfriou antes da resposta.";
+    }
+
+    if (/\b(fila|espera|acumul)\b/i.test(source)) {
+      return "A fila do WhatsApp não espera.";
+    }
+
+    return stripOuterQuotes(concept.hook || concept.title);
+  }
+
+  if (/\b(print|conversa|whatsapp|mensagem|chat)\b/i.test(instruction)) {
+    if (/\b(como posso te ajudar|fala[y ]|fala ai|fala aí)\b/i.test(source)) {
+      return stripOuterQuotes(
+        concept.hook || "Falay, como posso te ajudar hoje?",
+      );
+    }
+
+    return "Mensagem recebida. Venda perdida.";
+  }
+
+  if (/\b(minimal|seco|curto|menos explic|limpo)\b/i.test(instruction)) {
+    return stripOuterQuotes(concept.hook || concept.title)
+      .replace(/\s+(hoje|agora)\?$/i, "?")
+      .replace(/\s+/g, " ");
+  }
+
+  if (
+    /\b(manifesto|marca|propriet[aá]ri|assinatura|memor[aá]vel)\b/i.test(
+      instruction,
+    )
+  ) {
+    return stripOuterQuotes(concept.title || concept.hook);
+  }
+
+  return stripOuterQuotes(concept.hook || concept.title);
+}
+
+function buildObjectiveCta(
+  project: CreativeProject,
+  brandProfile: BrandProfile,
+  instruction: string,
+) {
+  if (/\b(seco|minimal|curto|limpo|menos explic)\b/i.test(instruction)) {
+    return brandProfile.brandName
+      ? `${brandProfile.brandName}. Responder.`
+      : "Responder.";
+  }
+
   if (project.briefing.objective === "lead_capture") {
     return "Comente GUIA.";
   }
@@ -151,20 +218,41 @@ function buildSupportCopy(
   project: CreativeProject,
   concept: CreativeConcept,
   headline: string,
+  instruction: string,
 ) {
-  const source = [
-    project.briefing.topic,
-    project.briefing.mainMessage,
-    project.briefing.context,
-    concept.centralIdea,
-    concept.copyDirection.openingMove,
-    concept.visualDirection.visualFamily,
-  ]
-    .join(" ")
-    .toLocaleLowerCase("pt-BR");
+  const source = buildTypographicSource(project, concept);
   const headlineSource = headline.toLocaleLowerCase("pt-BR");
 
-  if (/\b(14h|19h|hor[aá]rio|demor|atras|esfri)/i.test(source)) {
+  if (/\b(provoc|agressiv|tens[aã]o|urgent|duro|dor)\b/i.test(instruction)) {
+    if (
+      /\b(whatsapp|mensagem|conversa|cliente|demor\w*|atras\w*|tarde|esfri\w*)\b/i.test(
+        source,
+      )
+    ) {
+      return "A resposta chegou depois da decisão.";
+    }
+
+    return "O problema aparece antes da venda.";
+  }
+
+  if (/\b(seco|minimal|curto|menos explic|limpo)\b/i.test(instruction)) {
+    if (/\b(whatsapp|mensagem|conversa|cliente)\b/i.test(source)) {
+      return "Seu cliente não espera.";
+    }
+
+    return removeDuplicateLead(
+      concept.centralIdea || project.briefing.topic,
+      headline,
+    );
+  }
+
+  if (/\b(print|conversa|whatsapp|mensagem|chat)\b/i.test(instruction)) {
+    return "A venda esfria no intervalo entre visto e respondido.";
+  }
+
+  if (
+    /\b(14h|19h|hor[aá]rio|demor\w*|atras\w*|tarde|esfri\w*)/i.test(source)
+  ) {
     return "A pergunta chegou. A resposta demorou. A venda esfriou.";
   }
 
@@ -180,6 +268,72 @@ function buildSupportCopy(
   }
 
   return removeDuplicateLead(concept.centralIdea || project.briefing.topic, headline);
+}
+
+function selectInitialVariant(
+  concept: CreativeConcept,
+  options: TypographicPieceGenerationOptions,
+): TypographicVariantId {
+  const instruction = normalizeInstruction(options.regenerationInstruction);
+
+  if (/\b(agressiv|provoc|tens[aã]o|urgent|duro|dor)\b/i.test(instruction)) {
+    return "editorial-tension";
+  }
+
+  if (
+    /\b(print|conversa|whatsapp|mensagem|chat|limp|minimal|seco)\b/i.test(
+      instruction,
+    )
+  ) {
+    return "conversation-clean";
+  }
+
+  if (
+    /\b(manifesto|marca|propriet[aá]ri|assinatura|memor[aá]vel)\b/i.test(
+      instruction,
+    )
+  ) {
+    return "manifesto-mark";
+  }
+
+  const source = [
+    concept.visualDirection.visualFamily,
+    concept.copyDirection.style,
+    concept.recommendedFormat,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("pt-BR");
+
+  if (/\b(print|conversa|whatsapp|mensagem|chat|limp)\b/i.test(source)) {
+    return "conversation-clean";
+  }
+
+  if (
+    /\b(manifesto|marca|propriet[aá]ri|assinatura|memor[aá]vel)\b/i.test(source)
+  ) {
+    return "manifesto-mark";
+  }
+
+  return "editorial-tension";
+}
+
+function buildTypographicSource(project: CreativeProject, concept: CreativeConcept) {
+  return [
+    project.briefing.topic,
+    project.briefing.mainMessage,
+    project.briefing.context,
+    concept.title,
+    concept.hook,
+    concept.centralIdea,
+    concept.copyDirection.openingMove,
+    concept.visualDirection.visualFamily,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function normalizeInstruction(value?: string) {
+  return compactWhitespace(value || "").toLocaleLowerCase("pt-BR");
 }
 
 function removeDuplicateLead(value: string, headline: string) {

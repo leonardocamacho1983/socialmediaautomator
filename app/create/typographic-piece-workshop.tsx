@@ -22,7 +22,9 @@ type TypographicPieceWorkshopProps = {
   project: CreativeProject;
   selectedConcept: CreativeConcept;
   brandProfile: BrandProfile;
+  regenerationInstruction: string;
   onProduce: () => void;
+  onUpdateRegenerationInstruction: (value: string) => void;
   onUpdateCopy: (field: keyof TypographicCopy, value: string) => void;
   onSelectVariant: (variantId: TypographicVariantId) => void;
 };
@@ -31,7 +33,9 @@ export function TypographicPieceWorkshop({
   project,
   selectedConcept,
   brandProfile,
+  regenerationInstruction,
   onProduce,
+  onUpdateRegenerationInstruction,
   onUpdateCopy,
   onSelectVariant,
 }: TypographicPieceWorkshopProps) {
@@ -185,6 +189,22 @@ export function TypographicPieceWorkshop({
                   <small>{piece.copy.cta.length}/42</small>
                 </label>
               </div>
+            </div>
+
+            <div className="summary-block">
+              <label className="field typographic-regeneration-field">
+                <span>Direcao para regenerar</span>
+                <textarea
+                  value={regenerationInstruction}
+                  rows={3}
+                  maxLength={900}
+                  onChange={(event) =>
+                    onUpdateRegenerationInstruction(event.target.value)
+                  }
+                  placeholder="Ex: mais minimalista, mais agressivo, parecer print de conversa, menos institucional"
+                />
+                <small>{regenerationInstruction.length}/900</small>
+              </label>
             </div>
 
             <div className="summary-block">
