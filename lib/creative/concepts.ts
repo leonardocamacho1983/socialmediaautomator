@@ -1,4 +1,5 @@
 import type { BrandProfile } from "../brand/profile";
+import type { CaptionPackage } from "./captions";
 import type { TypographicPiece } from "./typographic-piece";
 
 export const CREATIVE_PROJECT_STORAGE_KEY =
@@ -68,6 +69,7 @@ export type CreativeProject = {
   batch: CreativeConceptBatch;
   selectedConceptId: string | null;
   typographicPiece?: TypographicPiece | null;
+  captionPackage?: CaptionPackage | null;
   updatedAt: string;
 };
 

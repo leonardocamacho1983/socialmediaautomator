@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CaptionWorkshop } from "./caption-workshop";
 import { TypographicPieceWorkshop } from "./typographic-piece-workshop";
 import {
   BRAND_PROFILE_STORAGE_KEY,
@@ -20,6 +21,11 @@ import {
   type CreativeConceptBatch,
   type CreativeProject,
 } from "../../lib/creative/concepts";
+import {
+  reviewCaptionForInstagram,
+  type CaptionPackage,
+  type CaptionVariantId,
+} from "../../lib/creative/captions";
 import {
   compactBrandProfileForGeneration,
   compactBriefingForGeneration,
@@ -54,8 +60,10 @@ export function ConceptGenerator() {
   const [briefing, setBriefing] = useState(emptyCreativeBriefing);
   const [project, setProject] = useState<CreativeProject | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [status, setStatus] = useState("Carregando perfil de marca.");
   const [error, setError] = useState("");
+  const [captionError, setCaptionError] = useState("");
 
   useEffect(() => {
     const storedBrand = window.localStorage.getItem(BRAND_PROFILE_STORAGE_KEY);
@@ -114,6 +122,12 @@ export function ConceptGenerator() {
   const activeTypographicPiece =
     project?.typographicPiece?.conceptId === selectedConcept?.id
       ? project?.typographicPiece
+      : null;
+  const activeCaptionPackage: CaptionPackage | null =
+    project?.captionPackage &&
+    project.captionPackage.conceptId === selectedConcept?.id &&
+    project.captionPackage.typographicPieceId === activeTypographicPiece?.id
+      ? project.captionPackage
       : null;
 
   function persistProject(nextProject: CreativeProject) {
@@ -208,6 +222,11 @@ export function ConceptGenerator() {
         project.typographicPiece?.conceptId === concept.id
           ? project.typographicPiece
           : null,
+      captionPackage:
+        project.captionPackage?.conceptId === concept.id &&
+        project.captionPackage.typographicPieceId === project.typographicPiece?.id
+          ? project.captionPackage
+          : null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -219,13 +238,15 @@ export function ConceptGenerator() {
       return;
     }
 
+    const typographicPiece = createTypographicPiece(
+      project,
+      selectedConcept,
+      activeBrandProfile,
+    );
     const nextProject: CreativeProject = {
       ...project,
-      typographicPiece: createTypographicPiece(
-        project,
-        selectedConcept,
-        activeBrandProfile,
-      ),
+      typographicPiece,
+      captionPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -268,10 +289,161 @@ export function ConceptGenerator() {
           [field]: value,
         },
       },
+      captionPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
-    setStatus("Copy visual atualizada.");
+    setStatus("Copy visual atualizada. Gere legenda novamente.");
+  }
+
+  async function generateCaptionPackage() {
+    setCaptionError("");
+
+    if (!project || !selectedConcept || !activeTypographicPiece) {
+      setCaptionError("Produza a peca tipografica antes de gerar legenda.");
+      return;
+    }
+
+    setIsGeneratingCaption(true);
+    setStatus("Gerando tres opcoes de legenda para o post.");
+
+    try {
+      const generationBrandProfile = compactBrandProfileForGeneration(
+        stripEmbeddedBrandAssets(activeBrandProfile),
+      );
+      const generationBriefing = compactBriefingForGeneration(project.briefing);
+      const response = await fetch("/api/captions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          brandProfile: generationBrandProfile,
+          briefing: generationBriefing,
+          selectedConcept,
+          typographicPiece: activeTypographicPiece,
+        }),
+      });
+
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const errorMessage =
+          payload && typeof payload === "object" && "error" in payload
+            ? String(payload.error)
+            : "Nao foi possivel gerar legenda.";
+        const errorCode =
+          payload && typeof payload === "object" && "code" in payload
+            ? String(payload.code)
+            : "";
+        throw new Error(
+          errorCode ? `${errorMessage} (${errorCode})` : errorMessage,
+        );
+      }
+
+      const nextProject: CreativeProject = {
+        ...project,
+        captionPackage: payload as CaptionPackage,
+        updatedAt: new Date().toISOString(),
+      };
+      persistProject(nextProject);
+      setStatus("Legendas geradas para revisao.");
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById("caption-workshop")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } catch (caughtError) {
+      setCaptionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Nao foi possivel gerar legenda.",
+      );
+      setStatus("Geracao de legenda interrompida.");
+    } finally {
+      setIsGeneratingCaption(false);
+    }
+  }
+
+  function selectCaptionVariant(variantId: CaptionVariantId) {
+    if (!project?.captionPackage) {
+      return;
+    }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      captionPackage: {
+        ...project.captionPackage,
+        selectedVariantId: variantId,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Variacao de legenda escolhida.");
+  }
+
+  function updateCaptionVariant(
+    field: "caption" | "firstComment",
+    value: string,
+  ) {
+    if (!project?.captionPackage) {
+      return;
+    }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
+        [field]: value,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Legenda atualizada.");
+  }
+
+  function updateCaptionHashtags(value: string) {
+    if (!project?.captionPackage) {
+      return;
+    }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
+        hashtags: parseHashtags(value),
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Hashtags atualizadas.");
+  }
+
+  function reviewSelectedCaption() {
+    if (!project?.captionPackage || !activeTypographicPiece) {
+      return;
+    }
+
+    const selectedVariant =
+      project.captionPackage.variants.find(
+        (variant) => variant.id === project.captionPackage?.selectedVariantId,
+      ) || project.captionPackage.variants[0];
+
+    if (!selectedVariant) {
+      return;
+    }
+
+    const review = reviewCaptionForInstagram(
+      selectedVariant.caption,
+      activeTypographicPiece.copy,
+      activeBrandProfile,
+    );
+    const nextProject: CreativeProject = {
+      ...project,
+      captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
+        review,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Legenda revisada contra criterios de Instagram.");
   }
 
   return (
@@ -429,14 +601,18 @@ export function ConceptGenerator() {
             {selectedConcept ? (
               <>
                 <h3>
-                  {activeTypographicPiece
-                    ? "Marco 3 em revisao"
-                    : "Pronto para Marco 3"}
+                  {activeCaptionPackage
+                    ? "Legenda em revisao"
+                    : activeTypographicPiece
+                      ? "Pronto para legenda"
+                      : "Pronto para Marco 3"}
                 </h3>
                 <p>
-                  {activeTypographicPiece
-                    ? "A peca tipografica ja esta pronta para comparar variacoes e baixar o PNG."
-                    : "Produzir a primeira peca tipografica a partir deste conceito: copy visual, layout 1080x1350 e tres variacoes."}
+                  {activeCaptionPackage
+                    ? "Agora edite a legenda, primeiro comentario e hashtags. A revisao ajuda a reduzir repeticao, promessa exagerada e cara de IA."
+                    : activeTypographicPiece
+                      ? "A peca tipografica esta pronta. Gere a legenda sabendo o que o visual ja diz."
+                      : "Produzir a primeira peca tipografica a partir deste conceito: copy visual, layout 1080x1350 e tres variacoes."}
                 </p>
                 <dl className="next-step-list">
                   <div>
@@ -449,17 +625,34 @@ export function ConceptGenerator() {
                   </div>
                   <div>
                     <dt>Saida</dt>
-                    <dd>Preview + PNG final</dd>
+                    <dd>
+                      {activeCaptionPackage
+                        ? "Legenda + primeiro comentario"
+                        : activeTypographicPiece
+                          ? "3 opcoes de legenda"
+                          : "Preview + PNG final"}
+                    </dd>
                   </div>
                 </dl>
                 <button
                   className="primary-button next-step-button"
                   type="button"
-                  onClick={produceTypographicPiece}
+                  disabled={Boolean(activeTypographicPiece && isGeneratingCaption)}
+                  onClick={
+                    activeTypographicPiece
+                      ? generateCaptionPackage
+                      : produceTypographicPiece
+                  }
                 >
-                  {activeTypographicPiece
-                    ? "Regenerar peca tipografica"
-                    : "Produzir peca tipografica"}
+                  {activeCaptionPackage
+                    ? isGeneratingCaption
+                      ? "Gerando..."
+                      : "Regenerar legendas"
+                    : activeTypographicPiece
+                      ? isGeneratingCaption
+                        ? "Gerando..."
+                        : "Gerar legenda"
+                      : "Produzir peca tipografica"}
                 </button>
                 {activeTypographicPiece ? (
                   <a className="secondary-button next-step-button" href="#typographic-piece">
@@ -485,6 +678,13 @@ export function ConceptGenerator() {
                           id: project.typographicPiece.id,
                           selectedVariantId:
                             project.typographicPiece.selectedVariantId,
+                        }
+                      : null,
+                    captionPackage: activeCaptionPackage
+                      ? {
+                          id: activeCaptionPackage.id,
+                          selectedVariantId:
+                            activeCaptionPackage.selectedVariantId,
                         }
                       : null,
                     decisionTrace: project.batch.decisionTrace,
@@ -582,6 +782,53 @@ export function ConceptGenerator() {
           onSelectVariant={selectTypographicVariant}
         />
       ) : null}
+
+      {project && selectedConcept && activeTypographicPiece ? (
+        <CaptionWorkshop
+          brandProfile={activeBrandProfile}
+          captionError={captionError}
+          captionPackage={activeCaptionPackage}
+          isGeneratingCaption={isGeneratingCaption}
+          project={project}
+          selectedConcept={selectedConcept}
+          onGenerateCaption={generateCaptionPackage}
+          onReviewCaption={reviewSelectedCaption}
+          onSelectCaptionVariant={selectCaptionVariant}
+          onUpdateCaptionHashtags={updateCaptionHashtags}
+          onUpdateCaptionVariant={updateCaptionVariant}
+        />
+      ) : null}
     </main>
   );
+}
+
+function updateSelectedCaptionVariant(
+  captionPackage: CaptionPackage,
+  patch: Partial<CaptionPackage["variants"][number]>,
+): CaptionPackage {
+  return {
+    ...captionPackage,
+    variants: captionPackage.variants.map((variant) =>
+      variant.id === captionPackage.selectedVariantId
+        ? {
+            ...variant,
+            ...patch,
+          }
+        : variant,
+    ),
+  };
+}
+
+function parseHashtags(value: string) {
+  return value
+    .split(/[\s,]+/)
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^#+/, "")
+        .replace(/[^\p{L}\p{N}_]/gu, ""),
+    )
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((item) => `#${item}`);
 }

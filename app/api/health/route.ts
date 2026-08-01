@@ -2,6 +2,10 @@ import {
   DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL,
   DEFAULT_CREATIVE_CONCEPT_MODEL,
 } from "../../../lib/creative/concepts";
+import {
+  DEFAULT_CAPTION_FALLBACK_MODEL,
+  DEFAULT_CAPTION_MODEL,
+} from "../../../lib/creative/captions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +16,7 @@ export function GET() {
   return Response.json({
     status: "ok",
     service: "socialmediaautomator",
-    milestone: "marco-3-typographic-post",
+    milestone: "marco-3-1-caption-generation",
     productFeaturesEnabled: true,
     aiGatewayConfigured: staticGatewayKeyPresent || vercelRuntimePresent,
     aiGatewayAuth: {
@@ -24,6 +28,9 @@ export function GET() {
     creativeConceptFallbackModel:
       process.env.CREATIVE_CONCEPT_FALLBACK_MODEL ||
       DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL,
+    captionModel: process.env.CAPTION_MODEL || DEFAULT_CAPTION_MODEL,
+    captionFallbackModel:
+      process.env.CAPTION_FALLBACK_MODEL || DEFAULT_CAPTION_FALLBACK_MODEL,
     timestamp: new Date().toISOString(),
   });
 }

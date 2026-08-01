@@ -12,6 +12,7 @@ This repository currently contains:
 - Marco 1 Brand Foundation at `/brand`;
 - Marco 2 Creative Concept Generator at `/create`.
 - Marco 3 Typographic Post Workshop inside `/create`.
+- Marco 3.1 Caption Workshop inside `/create`.
 
 The app still does not generate image assets, carousels, automations,
 analytics, or publications.

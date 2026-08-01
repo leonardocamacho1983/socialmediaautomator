@@ -28,7 +28,8 @@ Not included:
 - stock media;
 - carousel generation;
 - video or Reels;
-- final caption generation;
+- publishing caption workflow, documented separately in
+  `docs/caption-generation.md`;
 - Supabase persistence;
 - Zernio;
 - scheduling or publishing;
