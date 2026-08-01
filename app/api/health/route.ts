@@ -1,3 +1,8 @@
+import {
+  DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL,
+  DEFAULT_CREATIVE_CONCEPT_MODEL,
+} from "../../../lib/creative/concepts";
+
 export const dynamic = "force-dynamic";
 
 export function GET() {
@@ -15,7 +20,10 @@ export function GET() {
       vercelRuntimePresent,
     },
     creativeConceptModel:
-      process.env.CREATIVE_CONCEPT_MODEL || "anthropic/claude-sonnet-5",
+      process.env.CREATIVE_CONCEPT_MODEL || DEFAULT_CREATIVE_CONCEPT_MODEL,
+    creativeConceptFallbackModel:
+      process.env.CREATIVE_CONCEPT_FALLBACK_MODEL ||
+      DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL,
     timestamp: new Date().toISOString(),
   });
 }

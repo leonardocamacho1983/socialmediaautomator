@@ -39,23 +39,26 @@ The API route is:
 POST /api/concepts
 ```
 
-It uses the AI SDK with structured output:
+It uses the AI SDK through the Vercel AI Gateway and parses model JSON locally:
 
 ```text
-generateText + Output.object
+generateText -> JSON extraction -> Zod validation
 ```
 
 Default model:
 
 ```text
-anthropic/claude-sonnet-5
+openai/gpt-5.4-mini
 ```
 
-Override with:
+Fallback model:
 
 ```text
-CREATIVE_CONCEPT_MODEL=
+anthropic/claude-haiku-4.5
 ```
+
+Override with `CREATIVE_CONCEPT_MODEL=` and
+`CREATIVE_CONCEPT_FALLBACK_MODEL=`.
 
 Authentication is handled by either:
 

@@ -3,7 +3,9 @@ import type { BrandProfile } from "../brand/profile";
 export const CREATIVE_PROJECT_STORAGE_KEY =
   "socialmediaautomator.creativeProject.v1";
 
-export const DEFAULT_CREATIVE_CONCEPT_MODEL = "anthropic/claude-sonnet-5";
+export const DEFAULT_CREATIVE_CONCEPT_MODEL = "openai/gpt-5.4-mini";
+export const DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL =
+  "anthropic/claude-haiku-4.5";
 
 export type CreativeObjective =
   | "awareness"

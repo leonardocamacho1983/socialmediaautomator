@@ -1,6 +1,6 @@
 import {
   APICallError,
-  generateObject,
+  generateText,
   gateway,
   NoObjectGeneratedError,
   TypeValidationError,
@@ -8,6 +8,7 @@ import {
 import { z } from "zod";
 import { stripEmbeddedBrandAssets } from "../../../lib/brand/profile";
 import {
+  DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL,
   DEFAULT_CREATIVE_CONCEPT_MODEL,
   type CreativeConceptBatch,
 } from "../../../lib/creative/concepts";
@@ -35,6 +36,39 @@ function extractJsonObject(text: string) {
   }
 
   return candidate.slice(firstBrace, lastBrace + 1);
+}
+
+function parseModelOutput(text: string) {
+  const jsonText = extractJsonObject(text);
+
+  if (!jsonText) {
+    return {
+      success: false as const,
+      error: "NO_JSON_OBJECT",
+    };
+  }
+
+  try {
+    const parsedJson: unknown = JSON.parse(jsonText);
+    const parsedOutput = conceptOutputSchema.safeParse(parsedJson);
+
+    if (!parsedOutput.success) {
+      return {
+        success: false as const,
+        error: "SCHEMA_VALIDATION_FAILED",
+      };
+    }
+
+    return {
+      success: true as const,
+      data: parsedOutput.data,
+    };
+  } catch {
+    return {
+      success: false as const,
+      error: "JSON_PARSE_FAILED",
+    };
+  }
 }
 
 const brandProfileSchema = z.object({
@@ -184,6 +218,10 @@ export async function POST(request: Request) {
 
   const model =
     process.env.CREATIVE_CONCEPT_MODEL || DEFAULT_CREATIVE_CONCEPT_MODEL;
+  const fallbackModel =
+    process.env.CREATIVE_CONCEPT_FALLBACK_MODEL ||
+    DEFAULT_CREATIVE_CONCEPT_FALLBACK_MODEL;
+  const models = Array.from(new Set([model, fallbackModel].filter(Boolean)));
   const generationBrandProfile = compactBrandProfileForGeneration(
     stripEmbeddedBrandAssets(parsedRequest.data.brandProfile),
   );
@@ -195,88 +233,99 @@ export async function POST(request: Request) {
     generationBriefing,
   );
 
-  try {
-    const result = await generateObject({
-      model: gateway(model),
-      maxOutputTokens: 4200,
-      schema: conceptOutputSchema,
-      schemaName: "CreativeConceptBatch",
-      schemaDescription:
-        "Exactly three distinct Instagram creative concept directions.",
-      repairText: async ({ text }) => extractJsonObject(text),
-      providerOptions: {
-        gateway: {
-          tags: ["feature:creative-concepts", "milestone:marco-2"],
+  for (const activeModel of models) {
+    try {
+      const result = await generateText({
+        model: gateway(activeModel),
+        maxOutputTokens: 4200,
+        providerOptions: {
+          gateway: {
+            tags: [
+              "feature:creative-concepts",
+              "milestone:marco-2",
+              `model:${activeModel}`,
+            ],
+          },
         },
-      },
-      system:
-        "Voce e um diretor criativo senior, estrategista de social media e editor. Responda em portugues do Brasil. Seu trabalho aqui e criar direcoes criativas distintas, nao posts finais.",
-      prompt,
-    });
+        system:
+          "Voce e um diretor criativo senior, estrategista de social media e editor. Responda em portugues do Brasil. Responda somente com JSON valido, sem markdown e sem comentario fora do JSON.",
+        prompt,
+      });
 
-    const batch: CreativeConceptBatch = {
-      concepts: result.object.concepts.slice(0, 3).map((concept, index) => ({
-        ...concept,
-        id: `concept-${index + 1}`,
-      })),
-      decisionTrace: result.object.decisionTrace,
-      model,
-      generatedAt: new Date().toISOString(),
-    };
+      const parsedOutput = parseModelOutput(result.text);
 
-    return Response.json(batch);
-  } catch (error) {
-    console.error("Creative concept generation failed", {
-      name: error instanceof Error ? error.name : "UnknownError",
-      statusCode: APICallError.isInstance(error) ? error.statusCode : null,
-      promptChars: prompt.length,
-    });
+      if (!parsedOutput.success) {
+        console.error("Creative concept JSON parse failed", {
+          model: activeModel,
+          reason: parsedOutput.error,
+          promptChars: prompt.length,
+          textChars: result.text.length,
+        });
+        continue;
+      }
 
-    if (APICallError.isInstance(error)) {
-      return Response.json(
-        {
-          code: "AI_GATEWAY_CALL_FAILED",
-          error: "Falha ao chamar o AI Gateway.",
-          statusCode: error.statusCode,
-        },
-        { status: error.statusCode || 502 },
-      );
+      const batch: CreativeConceptBatch = {
+        concepts: parsedOutput.data.concepts
+          .slice(0, 3)
+          .map((concept, index) => ({
+            ...concept,
+            id: `concept-${index + 1}`,
+          })),
+        decisionTrace: parsedOutput.data.decisionTrace,
+        model: activeModel,
+        generatedAt: new Date().toISOString(),
+      };
+
+      return Response.json(batch);
+    } catch (error) {
+      console.error("Creative concept generation failed", {
+        model: activeModel,
+        name: error instanceof Error ? error.name : "UnknownError",
+        statusCode: APICallError.isInstance(error) ? error.statusCode : null,
+        promptChars: prompt.length,
+      });
+
+      if (APICallError.isInstance(error) && error.statusCode === 401) {
+        return Response.json(
+          {
+            code: "AI_GATEWAY_AUTH_FAILED",
+            error:
+              "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
+          },
+          { status: 503 },
+        );
+      }
+
+      if (
+        error instanceof Error &&
+        error.name === "GatewayAuthenticationError"
+      ) {
+        return Response.json(
+          {
+            code: "AI_GATEWAY_AUTH_FAILED",
+            error:
+              "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
+          },
+          { status: 503 },
+        );
+      }
+
+      if (
+        APICallError.isInstance(error) ||
+        NoObjectGeneratedError.isInstance(error) ||
+        TypeValidationError.isInstance(error)
+      ) {
+        continue;
+      }
     }
-
-    if (
-      error instanceof Error &&
-      error.name === "GatewayAuthenticationError"
-    ) {
-      return Response.json(
-        {
-          code: "AI_GATEWAY_AUTH_FAILED",
-          error:
-            "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
-        },
-        { status: 503 },
-      );
-    }
-
-    if (
-      NoObjectGeneratedError.isInstance(error) ||
-      TypeValidationError.isInstance(error)
-    ) {
-      return Response.json(
-        {
-          code: "MODEL_OUTPUT_INVALID",
-          error:
-            "O modelo respondeu fora do contrato esperado. Tente gerar novamente.",
-        },
-        { status: 502 },
-      );
-    }
-
-    return Response.json(
-      {
-        code: error instanceof Error ? error.name : "UNKNOWN_GENERATION_ERROR",
-        error: "Nao foi possivel gerar conceitos criativos.",
-      },
-      { status: 500 },
-    );
   }
+
+  return Response.json(
+    {
+      code: "MODEL_OUTPUT_INVALID",
+      error:
+        "Os modelos tentados nao devolveram JSON valido. Tente gerar novamente.",
+    },
+    { status: 502 },
+  );
 }
