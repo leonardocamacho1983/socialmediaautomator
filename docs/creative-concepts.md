@@ -16,6 +16,8 @@ Included:
 - shows each concept with hook, central idea, narrative structure, visual
   direction, copy direction, fit rationale, and risk notes;
 - lets the user choose one concept;
+- shows the next Marco 3 handoff after a concept is chosen;
+- copies a selected-concept production contract for the next milestone;
 - persists the latest generated project and selected concept in browser
   `localStorage`.
 
@@ -23,6 +25,7 @@ Not included:
 
 - final copy;
 - rendered assets;
+- Marco 3 production workflow;
 - Recraft or image generation;
 - Supabase persistence;
 - Zernio;

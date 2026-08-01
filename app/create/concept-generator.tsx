@@ -50,6 +50,7 @@ export function ConceptGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState("Carregando perfil de marca.");
   const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     const storedBrand = window.localStorage.getItem(BRAND_PROFILE_STORAGE_KEY);
@@ -99,6 +100,27 @@ export function ConceptGenerator() {
       ) || null
     );
   }, [project]);
+
+  const selectedProductionContract = useMemo(() => {
+    if (!project || !selectedConcept) {
+      return null;
+    }
+
+    return {
+      milestone: "marco-3-first-typographic-post",
+      nextStep:
+        "Transformar o conceito escolhido em uma peca tipografica 1080x1350.",
+      brandName: project.brandSnapshot.brandName,
+      briefing: project.briefing,
+      selectedConcept,
+      productionTargets: {
+        firstOutput: "post tipografico 1080x1350",
+        visualCopy: "headline, apoio e CTA visual",
+        layout: "3 variacoes de composicao",
+        export: "preview e PNG final",
+      },
+    };
+  }, [project, selectedConcept]);
 
   function updateBriefing<K extends keyof CreativeBriefing>(
     key: K,
@@ -191,7 +213,25 @@ export function ConceptGenerator() {
       JSON.stringify(nextProject),
     );
     setProject(nextProject);
+    setCopyStatus("");
     setStatus(`Conceito escolhido: ${concept.title}`);
+  }
+
+  async function copyProductionContract() {
+    if (!selectedProductionContract) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(selectedProductionContract, null, 2),
+      );
+      setCopyStatus("Contrato copiado.");
+      window.setTimeout(() => setCopyStatus(""), 2600);
+    } catch {
+      setCopyStatus("");
+      setError("Nao foi possivel copiar o contrato do conceito.");
+    }
   }
 
   return (
@@ -338,6 +378,54 @@ export function ConceptGenerator() {
             {project?.batch.model ? <span>Modelo: {project.batch.model}</span> : null}
           </div>
 
+          <div
+            className={
+              selectedConcept
+                ? "next-step-panel"
+                : "next-step-panel next-step-panel-muted"
+            }
+          >
+            <p className="section-kicker">Proximo passo</p>
+            {selectedConcept ? (
+              <>
+                <h3>Pronto para Marco 3</h3>
+                <p>
+                  Produzir a primeira peca tipografica a partir deste conceito:
+                  copy visual, layout 1080x1350 e tres variacoes.
+                </p>
+                <dl className="next-step-list">
+                  <div>
+                    <dt>Formato</dt>
+                    <dd>{selectedConcept.recommendedFormat}</dd>
+                  </div>
+                  <div>
+                    <dt>Direcao</dt>
+                    <dd>{selectedConcept.visualDirection.visualFamily}</dd>
+                  </div>
+                  <div>
+                    <dt>Saida</dt>
+                    <dd>Preview + PNG final</dd>
+                  </div>
+                </dl>
+                <button
+                  className="primary-button next-step-button"
+                  type="button"
+                  onClick={copyProductionContract}
+                >
+                  Copiar contrato do Marco 3
+                </button>
+                {copyStatus ? (
+                  <span className="next-step-status">{copyStatus}</span>
+                ) : null}
+              </>
+            ) : (
+              <p>
+                Escolha uma alternativa para travar o conceito e preparar a
+                producao visual.
+              </p>
+            )}
+          </div>
+
           <pre className="profile-preview">
             {JSON.stringify(
               project
@@ -363,59 +451,67 @@ export function ConceptGenerator() {
           </div>
 
           <div className="concept-card-grid">
-            {project.batch.concepts.map((concept) => (
-              <article
-                className={
-                  concept.id === project.selectedConceptId
-                    ? "concept-card concept-card-selected"
-                    : "concept-card"
-                }
-                key={concept.id}
-              >
-                <div>
-                  <p className="section-kicker">{concept.recommendedFormat}</p>
-                  <h3>{concept.title}</h3>
-                  <p className="concept-hook">{concept.hook}</p>
-                </div>
+            {project.batch.concepts.map((concept) => {
+              const isSelected = concept.id === project.selectedConceptId;
 
-                <dl className="concept-details">
-                  <div>
-                    <dt>Ideia central</dt>
-                    <dd>{concept.centralIdea}</dd>
-                  </div>
-                  <div>
-                    <dt>Direcao visual</dt>
-                    <dd>{concept.visualDirection.visualFamily}</dd>
-                  </div>
-                  <div>
-                    <dt>Copy</dt>
-                    <dd>{concept.copyDirection.style}</dd>
-                  </div>
-                </dl>
-
-                <div>
-                  <h4>Estrutura narrativa</h4>
-                  <ol>
-                    {concept.narrativeStructure.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-
-                <div className="concept-note">
-                  <strong>Por que serve</strong>
-                  <span>{concept.whyItFitsBrand}</span>
-                </div>
-
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => selectConcept(concept)}
+              return (
+                <article
+                  className={
+                    isSelected
+                      ? "concept-card concept-card-selected"
+                      : "concept-card"
+                  }
+                  key={concept.id}
                 >
-                  Escolher conceito
-                </button>
-              </article>
-            ))}
+                  <div>
+                    <p className="section-kicker">
+                      {concept.recommendedFormat}
+                    </p>
+                    <h3>{concept.title}</h3>
+                    <p className="concept-hook">{concept.hook}</p>
+                  </div>
+
+                  <dl className="concept-details">
+                    <div>
+                      <dt>Ideia central</dt>
+                      <dd>{concept.centralIdea}</dd>
+                    </div>
+                    <div>
+                      <dt>Direcao visual</dt>
+                      <dd>{concept.visualDirection.visualFamily}</dd>
+                    </div>
+                    <div>
+                      <dt>Copy</dt>
+                      <dd>{concept.copyDirection.style}</dd>
+                    </div>
+                  </dl>
+
+                  <div>
+                    <h4>Estrutura narrativa</h4>
+                    <ol>
+                      {concept.narrativeStructure.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="concept-note">
+                    <strong>Por que serve</strong>
+                    <span>{concept.whyItFitsBrand}</span>
+                  </div>
+
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isSelected}
+                    aria-pressed={isSelected}
+                    onClick={() => selectConcept(concept)}
+                  >
+                    {isSelected ? "Conceito escolhido" : "Escolher conceito"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
       ) : null}

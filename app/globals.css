@@ -334,9 +334,16 @@ h2 {
   cursor: pointer;
 }
 
-.primary-button:disabled {
+.primary-button:disabled,
+.secondary-button:disabled {
   cursor: wait;
   opacity: 0.62;
+}
+
+.secondary-button:disabled {
+  cursor: default;
+  background: var(--surface-muted);
+  color: var(--accent-strong);
 }
 
 .nav-row {
@@ -387,6 +394,67 @@ h2 {
 
 .concept-aside {
   min-height: 420px;
+}
+
+.next-step-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, #ffffff);
+  padding: 16px;
+}
+
+.next-step-panel h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.next-step-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.next-step-panel-muted {
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.next-step-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.next-step-list div {
+  display: grid;
+  gap: 3px;
+}
+
+.next-step-list dt {
+  color: var(--foreground);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.next-step-list dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.next-step-button {
+  justify-content: center;
+}
+
+.next-step-status {
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 760;
 }
 
 .concept-results {
