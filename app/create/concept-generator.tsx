@@ -64,6 +64,8 @@ export function ConceptGenerator() {
   const [status, setStatus] = useState("Carregando perfil de marca.");
   const [error, setError] = useState("");
   const [captionError, setCaptionError] = useState("");
+  const [captionRegenerationInstruction, setCaptionRegenerationInstruction] =
+    useState("");
 
   useEffect(() => {
     const storedBrand = window.localStorage.getItem(BRAND_PROFILE_STORAGE_KEY);
@@ -322,6 +324,7 @@ export function ConceptGenerator() {
           briefing: generationBriefing,
           selectedConcept,
           typographicPiece: activeTypographicPiece,
+          regenerationInstruction: captionRegenerationInstruction,
         }),
       });
 
@@ -790,12 +793,14 @@ export function ConceptGenerator() {
           captionPackage={activeCaptionPackage}
           isGeneratingCaption={isGeneratingCaption}
           project={project}
+          regenerationInstruction={captionRegenerationInstruction}
           selectedConcept={selectedConcept}
           onGenerateCaption={generateCaptionPackage}
           onReviewCaption={reviewSelectedCaption}
           onSelectCaptionVariant={selectCaptionVariant}
           onUpdateCaptionHashtags={updateCaptionHashtags}
           onUpdateCaptionVariant={updateCaptionVariant}
+          onUpdateRegenerationInstruction={setCaptionRegenerationInstruction}
         />
       ) : null}
     </main>

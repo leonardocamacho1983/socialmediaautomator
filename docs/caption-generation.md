@@ -20,6 +20,8 @@ Included:
   variant;
 - lets the user select a variant;
 - lets the user edit caption, first comment, and hashtags;
+- lets the user add an optional instruction before generating or regenerating
+  captions;
 - runs a local review against clarity, comment potential, share potential,
   save potential, brand fit, AI-like copy risk, and overpromise risk;
 - copies the selected caption package to the clipboard;
@@ -86,6 +88,8 @@ Then validate `/create` with a selected concept and typographic piece:
 2. Confirm three variants appear.
 3. Select each variant.
 4. Edit the caption, first comment, and hashtags.
-5. Click `Revisar para Instagram`.
-6. Confirm the review changes after editing.
-7. Click `Copiar legenda`.
+5. Add an optional instruction in `Direcao para regenerar`.
+6. Click `Regenerar legendas`.
+7. Click `Revisar para Instagram`.
+8. Confirm the review changes after editing.
+9. Click `Copiar legenda`.

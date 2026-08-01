@@ -141,6 +141,7 @@ export function buildCaptionPrompt(input: CaptionGenerationInput) {
     cta: input.typographicPiece.copy.cta,
     selectedVariantId: input.typographicPiece.selectedVariantId,
   };
+  const regenerationInstruction = input.regenerationInstruction?.trim();
 
   return [
     "Crie exatamente 3 opcoes de legenda para o post de Instagram abaixo.",
@@ -181,6 +182,11 @@ export function buildCaptionPrompt(input: CaptionGenerationInput) {
     "",
     "Copy visual final da peca tipografica:",
     JSON.stringify(visualCopy, null, 2),
+    "",
+    "Direcao extra do usuario para esta geracao:",
+    regenerationInstruction
+      ? regenerationInstruction
+      : "Sem direcao extra. Siga o briefing, a marca, o conceito e a copy visual.",
     "",
     "Contrato de saida obrigatorio:",
     JSON.stringify(

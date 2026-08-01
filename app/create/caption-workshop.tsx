@@ -20,7 +20,9 @@ type CaptionWorkshopProps = {
   captionPackage: CaptionPackage | null;
   isGeneratingCaption: boolean;
   captionError: string;
+  regenerationInstruction: string;
   onGenerateCaption: () => void;
+  onUpdateRegenerationInstruction: (value: string) => void;
   onSelectCaptionVariant: (variantId: CaptionVariantId) => void;
   onUpdateCaptionVariant: (
     field: "caption" | "firstComment",
@@ -43,7 +45,9 @@ export function CaptionWorkshop({
   captionPackage,
   isGeneratingCaption,
   captionError,
+  regenerationInstruction,
   onGenerateCaption,
+  onUpdateRegenerationInstruction,
   onSelectCaptionVariant,
   onUpdateCaptionVariant,
   onUpdateCaptionHashtags,
@@ -182,6 +186,20 @@ export function CaptionWorkshop({
                 onChange={(event) => onUpdateCaptionHashtags(event.target.value)}
                 placeholder="#atendimento #whatsapp #vendas"
               />
+            </label>
+
+            <label className="field caption-regeneration-field">
+              <span>Direcao para regenerar</span>
+              <textarea
+                value={regenerationInstruction}
+                rows={3}
+                maxLength={1200}
+                onChange={(event) =>
+                  onUpdateRegenerationInstruction(event.target.value)
+                }
+                placeholder="Ex: mais seco, mais provocativo, menos explicativo, usar uma cena real de atraso no WhatsApp"
+              />
+              <small>{regenerationInstruction.length}/1200</small>
             </label>
 
             <div className="caption-actions">

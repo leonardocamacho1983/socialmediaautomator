@@ -234,6 +234,7 @@ const requestSchema = z.object({
   briefing: briefingSchema,
   selectedConcept: conceptSchema,
   typographicPiece: typographicPieceSchema,
+  regenerationInstruction: z.string().max(1200).optional().catch(""),
 });
 
 function coerceCaptionVariants(
@@ -507,6 +508,10 @@ export async function POST(request: Request) {
     briefing: compactBriefingForGeneration(parsedRequest.data.briefing),
     selectedConcept: parsedRequest.data.selectedConcept,
     typographicPiece: parsedRequest.data.typographicPiece,
+    regenerationInstruction: compactRouteCaption(
+      parsedRequest.data.regenerationInstruction || "",
+      1200,
+    ),
   };
   const prompt = buildCaptionPrompt(generationInput);
 

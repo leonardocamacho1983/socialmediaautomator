@@ -49,6 +49,7 @@ export type CaptionGenerationInput = {
   briefing: CreativeBriefing;
   selectedConcept: CreativeConcept;
   typographicPiece: TypographicPiece;
+  regenerationInstruction?: string;
 };
 
 export function buildCaptionPackage(

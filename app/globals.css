@@ -801,6 +801,16 @@ h2 {
   min-height: 260px;
 }
 
+.caption-regeneration-field {
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, #ffffff);
+  padding: 14px;
+}
+
+.caption-regeneration-field textarea {
+  min-height: 98px;
+}
+
 .caption-editor-panel .field small {
   justify-self: end;
   color: var(--muted);
