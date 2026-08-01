@@ -2,6 +2,7 @@ import {
   APICallError,
   generateText,
   gateway,
+  NoOutputGeneratedError,
   NoObjectGeneratedError,
   Output,
   TypeValidationError,
@@ -12,9 +13,15 @@ import {
   DEFAULT_CREATIVE_CONCEPT_MODEL,
   type CreativeConceptBatch,
 } from "../../../lib/creative/concepts";
+import {
+  compactBrandProfileForGeneration,
+  compactBriefingForGeneration,
+} from "../../../lib/creative/context";
 import { buildCreativeConceptPrompt } from "../../../lib/creative/prompts";
 
 export const dynamic = "force-dynamic";
+
+const MAX_REQUEST_BODY_CHARS = 240_000;
 
 const brandProfileSchema = z.object({
   brandName: z.string(),
@@ -95,10 +102,50 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const parsedRequest = requestSchema.safeParse(await request.json());
+  const contentLength = Number(request.headers.get("content-length") || "0");
+
+  if (contentLength > MAX_REQUEST_BODY_CHARS) {
+    return Response.json(
+      {
+        code: "REQUEST_TOO_LARGE",
+        error:
+          "O perfil enviado esta grande demais para gerar conceitos. Recarregue a pagina e tente novamente.",
+      },
+      { status: 413 },
+    );
+  }
+
+  let body: unknown;
+  try {
+    const rawBody = await request.text();
+
+    if (rawBody.length > MAX_REQUEST_BODY_CHARS) {
+      return Response.json(
+        {
+          code: "REQUEST_TOO_LARGE",
+          error:
+            "O perfil enviado esta grande demais para gerar conceitos. Recarregue a pagina e tente novamente.",
+        },
+        { status: 413 },
+      );
+    }
+
+    body = JSON.parse(rawBody);
+  } catch {
+    return Response.json(
+      {
+        code: "INVALID_JSON",
+        error: "Nao foi possivel ler os dados enviados pelo formulario.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const parsedRequest = requestSchema.safeParse(body);
   if (!parsedRequest.success) {
     return Response.json(
       {
+        code: "INVALID_REQUEST",
         error: "Briefing ou perfil de marca invalido.",
         details: parsedRequest.error.flatten(),
       },
@@ -108,8 +155,15 @@ export async function POST(request: Request) {
 
   const model =
     process.env.CREATIVE_CONCEPT_MODEL || DEFAULT_CREATIVE_CONCEPT_MODEL;
-  const generationBrandProfile = stripEmbeddedBrandAssets(
-    parsedRequest.data.brandProfile,
+  const generationBrandProfile = compactBrandProfileForGeneration(
+    stripEmbeddedBrandAssets(parsedRequest.data.brandProfile),
+  );
+  const generationBriefing = compactBriefingForGeneration(
+    parsedRequest.data.briefing,
+  );
+  const prompt = buildCreativeConceptPrompt(
+    generationBrandProfile,
+    generationBriefing,
   );
 
   try {
@@ -126,10 +180,7 @@ export async function POST(request: Request) {
       },
       system:
         "Voce e um diretor criativo senior, estrategista de social media e editor. Responda em portugues do Brasil. Seu trabalho aqui e criar direcoes criativas distintas, nao posts finais.",
-      prompt: buildCreativeConceptPrompt(
-        generationBrandProfile,
-        parsedRequest.data.briefing,
-      ),
+      prompt,
     });
 
     const batch: CreativeConceptBatch = {
@@ -147,11 +198,13 @@ export async function POST(request: Request) {
     console.error("Creative concept generation failed", {
       name: error instanceof Error ? error.name : "UnknownError",
       statusCode: APICallError.isInstance(error) ? error.statusCode : null,
+      promptChars: prompt.length,
     });
 
     if (APICallError.isInstance(error)) {
       return Response.json(
         {
+          code: "AI_GATEWAY_CALL_FAILED",
           error: "Falha ao chamar o AI Gateway.",
           statusCode: error.statusCode,
         },
@@ -165,6 +218,7 @@ export async function POST(request: Request) {
     ) {
       return Response.json(
         {
+          code: "AI_GATEWAY_AUTH_FAILED",
           error:
             "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
         },
@@ -174,10 +228,12 @@ export async function POST(request: Request) {
 
     if (
       NoObjectGeneratedError.isInstance(error) ||
+      NoOutputGeneratedError.isInstance(error) ||
       TypeValidationError.isInstance(error)
     ) {
       return Response.json(
         {
+          code: "MODEL_OUTPUT_INVALID",
           error:
             "O modelo respondeu fora do contrato esperado. Tente gerar novamente.",
         },
@@ -187,6 +243,7 @@ export async function POST(request: Request) {
 
     return Response.json(
       {
+        code: error instanceof Error ? error.name : "UNKNOWN_GENERATION_ERROR",
         error: "Nao foi possivel gerar conceitos criativos.",
       },
       { status: 500 },

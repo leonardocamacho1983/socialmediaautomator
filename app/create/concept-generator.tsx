@@ -19,6 +19,10 @@ import {
   type CreativeConceptBatch,
   type CreativeProject,
 } from "../../lib/creative/concepts";
+import {
+  compactBrandProfileForGeneration,
+  compactBriefingForGeneration,
+} from "../../lib/creative/context";
 
 const objectiveOptions = Object.entries(objectiveLabels) as Array<
   [CreativeBriefing["objective"], string]
@@ -119,7 +123,10 @@ export function ConceptGenerator() {
     setStatus("Gerando tres conceitos criativos distintos.");
 
     try {
-      const generationBrandProfile = stripEmbeddedBrandAssets(brandProfile);
+      const generationBrandProfile = compactBrandProfileForGeneration(
+        stripEmbeddedBrandAssets(brandProfile),
+      );
+      const generationBriefing = compactBriefingForGeneration(briefing);
       const response = await fetch("/api/concepts", {
         method: "POST",
         headers: {
@@ -127,22 +134,28 @@ export function ConceptGenerator() {
         },
         body: JSON.stringify({
           brandProfile: generationBrandProfile,
-          briefing,
+          briefing: generationBriefing,
         }),
       });
 
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        const message =
+        const errorMessage =
           payload && typeof payload === "object" && "error" in payload
             ? String(payload.error)
             : "Nao foi possivel gerar conceitos.";
-        throw new Error(message);
+        const errorCode =
+          payload && typeof payload === "object" && "code" in payload
+            ? String(payload.code)
+            : "";
+        throw new Error(
+          errorCode ? `${errorMessage} (${errorCode})` : errorMessage,
+        );
       }
 
       const nextProject = createProject(
         generationBrandProfile,
-        briefing,
+        generationBriefing,
         payload as CreativeConceptBatch,
       );
       window.localStorage.setItem(
