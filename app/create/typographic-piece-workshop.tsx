@@ -14,6 +14,7 @@ import {
   svgToDataUrl,
   TYPOGRAPHIC_POST_HEIGHT,
   TYPOGRAPHIC_POST_WIDTH,
+  type TypographicCopy,
   type TypographicVariantId,
 } from "../../lib/creative/typographic-piece";
 
@@ -22,6 +23,7 @@ type TypographicPieceWorkshopProps = {
   selectedConcept: CreativeConcept;
   brandProfile: BrandProfile;
   onProduce: () => void;
+  onUpdateCopy: (field: keyof TypographicCopy, value: string) => void;
   onSelectVariant: (variantId: TypographicVariantId) => void;
 };
 
@@ -30,6 +32,7 @@ export function TypographicPieceWorkshop({
   selectedConcept,
   brandProfile,
   onProduce,
+  onUpdateCopy,
   onSelectVariant,
 }: TypographicPieceWorkshopProps) {
   const [exportStatus, setExportStatus] = useState("");
@@ -143,20 +146,45 @@ export function TypographicPieceWorkshop({
           <aside className="typographic-control-panel">
             <div className="summary-block">
               <p className="section-kicker">Copy visual</p>
-              <dl className="typographic-copy-list">
-                <div>
-                  <dt>Headline</dt>
-                  <dd>{piece.copy.headline}</dd>
-                </div>
-                <div>
-                  <dt>Apoio</dt>
-                  <dd>{piece.copy.support}</dd>
-                </div>
-                <div>
-                  <dt>CTA visual</dt>
-                  <dd>{piece.copy.cta}</dd>
-                </div>
-              </dl>
+              <div className="typographic-copy-editor">
+                <label className="field">
+                  <span>Headline</span>
+                  <textarea
+                    value={piece.copy.headline}
+                    maxLength={86}
+                    rows={3}
+                    onChange={(event) =>
+                      onUpdateCopy("headline", event.target.value)
+                    }
+                  />
+                  <small>{piece.copy.headline.length}/86</small>
+                </label>
+
+                <label className="field">
+                  <span>Apoio</span>
+                  <textarea
+                    value={piece.copy.support}
+                    maxLength={112}
+                    rows={3}
+                    onChange={(event) =>
+                      onUpdateCopy("support", event.target.value)
+                    }
+                  />
+                  <small>{piece.copy.support.length}/112</small>
+                </label>
+
+                <label className="field">
+                  <span>CTA visual</span>
+                  <input
+                    value={piece.copy.cta}
+                    maxLength={42}
+                    onChange={(event) =>
+                      onUpdateCopy("cta", event.target.value)
+                    }
+                  />
+                  <small>{piece.copy.cta.length}/42</small>
+                </label>
+              </div>
             </div>
 
             <div className="summary-block">

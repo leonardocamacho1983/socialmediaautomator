@@ -113,45 +113,73 @@ function buildTypographicCopy(
   concept: CreativeConcept,
   brandProfile: BrandProfile,
 ): TypographicCopy {
-  const headline = trimForDisplay(concept.hook || concept.title, 92);
-  const supportSource =
-    project.briefing.mainMessage ||
-    concept.centralIdea ||
-    concept.whyItFitsBrand ||
-    project.briefing.topic;
-  const support = trimForDisplay(removeDuplicateLead(supportSource, headline), 170);
-  const preferredWord =
-    brandProfile.preferredWords.find((word) => word.length <= 28) || "";
-  const cta =
-    preferredWord && brandProfile.brandName
-      ? `${brandProfile.brandName}. ${preferredWord}.`
-      : buildObjectiveCta(project, brandProfile);
+  const headline = trimForDisplay(
+    stripOuterQuotes(concept.hook || concept.title),
+    86,
+  );
+  const support = buildSupportCopy(project, concept, headline);
+  const cta = buildObjectiveCta(project, brandProfile);
 
   return {
     headline,
-    support,
-    cta: trimForDisplay(cta, 70),
+    support: trimForDisplay(support, 112),
+    cta: trimForDisplay(cta, 42),
   };
 }
 
 function buildObjectiveCta(project: CreativeProject, brandProfile: BrandProfile) {
   if (project.briefing.objective === "lead_capture") {
-    return "Comente para receber.";
+    return "Comente GUIA.";
   }
 
   if (project.briefing.objective === "conversation") {
-    return "Qual conversa ainda esta esperando?";
+    return "No seu tom.";
   }
 
   if (project.briefing.objective === "conversion") {
-    return "Responda antes da venda esfriar.";
+    return "Antes da venda esfriar.";
   }
 
   if (brandProfile.brandName) {
-    return `${brandProfile.brandName}. No tom do seu negocio.`;
+    return `${brandProfile.brandName}. Sem sumir.`;
   }
 
-  return "No tom do seu negocio.";
+  return "Sem sumir.";
+}
+
+function buildSupportCopy(
+  project: CreativeProject,
+  concept: CreativeConcept,
+  headline: string,
+) {
+  const source = [
+    project.briefing.topic,
+    project.briefing.mainMessage,
+    project.briefing.context,
+    concept.centralIdea,
+    concept.copyDirection.openingMove,
+    concept.visualDirection.visualFamily,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("pt-BR");
+  const headlineSource = headline.toLocaleLowerCase("pt-BR");
+
+  if (/\b(14h|19h|hor[aá]rio|demor|atras|esfri)/i.test(source)) {
+    return "A pergunta chegou. A resposta demorou. A venda esfriou.";
+  }
+
+  if (
+    headlineSource.includes("como posso te ajudar") ||
+    /\b(atendimento|cliente|whatsapp|mensagem|conversa)\b/i.test(source)
+  ) {
+    return "Seu cliente não espera até você ter tempo.";
+  }
+
+  if (/\b(fila|espera|acumul)/i.test(source)) {
+    return "Enquanto a fila cresce, a venda vai embora.";
+  }
+
+  return removeDuplicateLead(concept.centralIdea || project.briefing.topic, headline);
 }
 
 function removeDuplicateLead(value: string, headline: string) {
@@ -167,6 +195,10 @@ function removeDuplicateLead(value: string, headline: string) {
   }
 
   return cleanValue;
+}
+
+function stripOuterQuotes(value: string) {
+  return compactWhitespace(value).replace(/^["'“”]+|["'“”]+$/g, "");
 }
 
 function renderEditorialTension(
@@ -191,7 +223,6 @@ function renderEditorialTension(
     <rect width="1080" height="1350" fill="${palette.background}" />
     <rect x="72" y="82" width="10" height="184" fill="${palette.accent}" />
     <text x="104" y="116" ${font.body} font-size="28" font-weight="850" fill="${palette.primary}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
-    <text x="104" y="154" ${font.body} font-size="24" font-weight="740" fill="${palette.muted}">post tipografico 1080x1350</text>
     ${renderTextLines({
       lines: headlineLines,
       x: 92,
@@ -316,7 +347,6 @@ function renderManifestoMark(
     <rect x="0" y="0" width="1080" height="240" fill="${palette.accent}" />
     <rect x="72" y="300" width="936" height="708" fill="${palette.primary}" opacity="0.34" />
     <text x="76" y="132" ${font.body} font-size="30" font-weight="850" fill="${palette.text}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
-    <text x="76" y="176" ${font.body} font-size="24" font-weight="760" fill="${palette.text}" opacity="0.78">primeira peca tipografica</text>
     ${renderTextLines({
       lines: headlineLines,
       x: 112,

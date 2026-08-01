@@ -631,31 +631,24 @@ h2 {
   gap: 20px;
 }
 
-.typographic-copy-list {
+.typographic-copy-editor {
   display: grid;
-  gap: 14px;
-  margin: 0;
+  gap: 12px;
 }
 
-.typographic-copy-list div {
-  display: grid;
-  gap: 5px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
+.typographic-copy-editor .field {
+  gap: 6px;
 }
 
-.typographic-copy-list dt {
-  color: var(--foreground);
-  font-size: 0.76rem;
-  font-weight: 850;
-  text-transform: uppercase;
+.typographic-copy-editor textarea {
+  min-height: auto;
 }
 
-.typographic-copy-list dd {
-  margin: 0;
+.typographic-copy-editor small {
+  justify-self: end;
   color: var(--muted);
-  font-size: 0.95rem;
-  line-height: 1.45;
+  font-size: 0.74rem;
+  font-weight: 720;
 }
 
 .typographic-variant-grid {

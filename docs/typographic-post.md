@@ -11,8 +11,11 @@ Included:
 
 - requires a selected Marco 2 concept;
 - creates visual copy from the selected concept and briefing;
+- avoids using raw briefing text as public visual copy;
+- strips internal production metadata from rendered assets;
 - produces a 1080x1350 typographic post specification;
 - renders three deterministic layout variations;
+- lets the user edit headline, support copy, and visual CTA after generation;
 - applies the current brand colors, typography settings, and logo when present;
 - lets the user choose one variation;
 - previews the selected variation in 4:5 format;
@@ -63,6 +66,8 @@ Then validate `/create` with a selected concept:
 
 1. Click `Produzir peca tipografica`.
 2. Confirm the 4:5 preview appears.
-3. Select each variation.
-4. Click `Baixar PNG`.
-5. Confirm a PNG download is created.
+3. Edit headline, support copy, or CTA.
+4. Confirm the preview updates.
+5. Select each variation.
+6. Click `Baixar PNG`.
+7. Confirm a PNG download is created.

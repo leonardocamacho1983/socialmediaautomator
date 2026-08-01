@@ -26,6 +26,7 @@ import {
 } from "../../lib/creative/context";
 import {
   createTypographicPiece,
+  type TypographicCopy,
   type TypographicVariantId,
 } from "../../lib/creative/typographic-piece";
 
@@ -251,6 +252,26 @@ export function ConceptGenerator() {
     };
     persistProject(nextProject);
     setStatus("Variacao tipografica escolhida.");
+  }
+
+  function updateTypographicCopy(field: keyof TypographicCopy, value: string) {
+    if (!project?.typographicPiece) {
+      return;
+    }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      typographicPiece: {
+        ...project.typographicPiece,
+        copy: {
+          ...project.typographicPiece.copy,
+          [field]: value,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Copy visual atualizada.");
   }
 
   return (
@@ -557,6 +578,7 @@ export function ConceptGenerator() {
           project={project}
           selectedConcept={selectedConcept}
           onProduce={produceTypographicPiece}
+          onUpdateCopy={updateTypographicCopy}
           onSelectVariant={selectTypographicVariant}
         />
       ) : null}
