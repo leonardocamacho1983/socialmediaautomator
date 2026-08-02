@@ -8,6 +8,7 @@ import {
 import type { GeneratedVisualAsset } from "./assets";
 import { getSelectedCaptionVariant, type CaptionPackage } from "./captions";
 import {
+  CURRENT_CAROUSEL_RENDERER,
   createCarouselPackage,
   type CarouselPackage,
 } from "./carousel";
@@ -903,6 +904,7 @@ function isCarouselPackage(value: unknown): value is CarouselPackage {
     typeof candidate.conceptId === "string" &&
     typeof candidate.generatedAt === "string" &&
     candidate.format === "4:5" &&
+    candidate.renderer === CURRENT_CAROUSEL_RENDERER &&
     Array.isArray(candidate.slides)
   );
 }

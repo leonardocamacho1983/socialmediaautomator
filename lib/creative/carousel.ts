@@ -20,6 +20,7 @@ export type CarouselSlide = {
   id: string;
   index: number;
   role: CarouselSlideRole;
+  internalPurpose: string;
   eyebrow: string;
   headline: string;
   body: string;
@@ -32,8 +33,19 @@ export type CarouselPackage = {
   conceptId: string;
   generatedAt: string;
   format: "4:5";
-  renderer: "deterministic-carousel-v1";
+  renderer: "deterministic-carousel-v2";
   slides: CarouselSlide[];
+};
+
+export const CURRENT_CAROUSEL_RENDERER = "deterministic-carousel-v2";
+
+export const carouselSlideRoleLabels: Record<CarouselSlideRole, string> = {
+  cover: "Capa",
+  scene: "Cena",
+  tension: "Custo",
+  mechanism: "Como muda",
+  proof: "Na pratica",
+  close: "Fechamento",
 };
 
 export type CarouselGenerationInput = {
@@ -56,7 +68,7 @@ export function createCarouselPackage(
     conceptId: input.concept.id,
     generatedAt: new Date().toISOString(),
     format: "4:5",
-    renderer: "deterministic-carousel-v1",
+    renderer: CURRENT_CAROUSEL_RENDERER,
     slides: buildSlides(input, now),
   };
 }
@@ -89,80 +101,366 @@ export function carouselSlideToDataUrl(
 }
 
 function buildSlides(input: CarouselGenerationInput, seed: number) {
-  const brandName = input.brandProfile.brandName || "Social Studio";
-  const narrative = normalizeNarrative(input.concept.narrativeStructure);
-  const captionOpening = firstSentence(input.captionVariant?.caption || "");
-  const sourceBody =
-    input.concept.centralIdea ||
-    input.briefing.mainMessage ||
-    input.typographicPiece.copy.support;
+  return buildPublicCarouselCopy(input).map((slide, index) => ({
+    id: `carousel-slide-${seed}-${index + 1}`,
+    index: index + 1,
+    ...slide,
+  }));
+}
 
+type CarouselSlideDraft = Omit<CarouselSlide, "id" | "index">;
+
+function buildPublicCarouselCopy(
+  input: CarouselGenerationInput,
+): CarouselSlideDraft[] {
+  const brandName = input.brandProfile.brandName || "Social Studio";
+
+  const drafts = isWhatsappSalesContext(input)
+    ? buildWhatsappSalesCarousel(input, brandName)
+    : buildGenericCarousel(input, brandName);
+
+  return drafts.map((slide) => sanitizeSlideDraft(slide, input, brandName));
+}
+
+function buildWhatsappSalesCarousel(
+  input: CarouselGenerationInput,
+  brandName: string,
+): CarouselSlideDraft[] {
   return [
     {
-      id: `carousel-slide-${seed}-1`,
-      index: 1,
-      role: "cover" as const,
+      role: "cover",
+      internalPurpose: "Abrir com o hook aprovado sem explicar a estrategia.",
       eyebrow: brandName,
       headline: cleanLine(input.typographicPiece.copy.headline, 92),
       body: cleanLine(input.typographicPiece.copy.support, 132),
       footer: "Arraste",
     },
     {
-      id: `carousel-slide-${seed}-2`,
-      index: 2,
-      role: "scene" as const,
-      eyebrow: "Cena",
-      headline: headlineFromNarrative(narrative[0], "O problema aparece antes."),
-      body: cleanLine(narrative[0] || captionOpening || sourceBody, 180),
+      role: "scene",
+      internalPurpose: "Colocar uma cena concreta de WhatsApp parado.",
+      eyebrow: "O que acontece",
+      headline: "O cliente mandou mensagem.",
+      body: "Ele nao esta navegando. Esta decidindo se espera voce ou chama outro.",
       footer: brandName,
     },
     {
-      id: `carousel-slide-${seed}-3`,
-      index: 3,
-      role: "tension" as const,
-      eyebrow: "Tensao",
-      headline: headlineFromNarrative(narrative[1], "A venda esfria no intervalo."),
-      body: cleanLine(narrative[1] || input.concept.hook || sourceBody, 190),
+      role: "tension",
+      internalPurpose: "Mostrar a consequencia comercial da demora.",
+      eyebrow: "O custo",
+      headline: "Demora tambem comunica.",
+      body: "Quando ninguem responde, o cliente entende que a venda nao e prioridade.",
       footer: input.typographicPiece.copy.cta,
     },
     {
-      id: `carousel-slide-${seed}-4`,
-      index: 4,
-      role: "mechanism" as const,
-      eyebrow: "Virada",
-      headline: headlineFromNarrative(narrative[2], "Responder muda a conversa."),
-      body: cleanLine(narrative[2] || input.briefing.mainMessage, 190),
-      footer: brandName,
-    },
-    {
-      id: `carousel-slide-${seed}-5`,
-      index: 5,
-      role: "proof" as const,
-      eyebrow: "Como fica",
-      headline: headlineFromNarrative(narrative[3], "Menos espera. Mais conversa."),
-      body: cleanLine(
-        narrative[3] ||
-          input.concept.whyItFitsBrand ||
-          input.concept.differentiationFromOthers,
-        190,
-      ),
-      footer: input.typographicPiece.copy.cta,
-    },
-    {
-      id: `carousel-slide-${seed}-6`,
-      index: 6,
-      role: "close" as const,
+      role: "mechanism",
+      internalPurpose: "Introduzir a marca como mecanismo pratico.",
       eyebrow: brandName,
-      headline: cleanLine(input.typographicPiece.copy.cta || brandName, 72),
-      body: cleanLine(
-        questionFromCaption(input.captionVariant?.firstComment || "") ||
-          input.captionVariant?.firstComment ||
-          "Hoje, quem responde quando voce nao esta online?",
-        150,
-      ),
-      footer: "Comente ou salve para revisar depois.",
+      headline: `${brandName} entra antes da conversa esfriar.`,
+      body: "Responde no tom do negocio e chama uma pessoa quando o assunto pede.",
+      footer: brandName,
+    },
+    {
+      role: "proof",
+      internalPurpose: "Diferenciar de chatbot generico.",
+      eyebrow: "Na pratica",
+      headline: "Nao e robo pedindo cadastro.",
+      body: "E atendimento treinado para manter a conversa viva ate o humano assumir.",
+      footer: input.typographicPiece.copy.cta,
+    },
+    {
+      role: "close",
+      internalPurpose: "Fechar com pergunta que puxa comentario ou reflexao.",
+      eyebrow: brandName,
+      headline: firstPublicQuestion(input) || "Quantas conversas estao paradas agora?",
+      body: "Olhe seu WhatsApp. Se a resposta demorou, a venda ja comecou a esfriar.",
+      footer: input.typographicPiece.copy.cta || "Comente ou salve para revisar depois.",
     },
   ];
+}
+
+function buildGenericCarousel(
+  input: CarouselGenerationInput,
+  brandName: string,
+): CarouselSlideDraft[] {
+  const customer = inferAudienceSubject(input);
+  const problem = publicProblem(input);
+  const value = publicValue(input, brandName);
+
+  return [
+    {
+      role: "cover",
+      internalPurpose: "Abrir com o hook aprovado.",
+      eyebrow: brandName,
+      headline: cleanLine(input.typographicPiece.copy.headline, 92),
+      body: cleanLine(input.typographicPiece.copy.support, 132),
+      footer: "Arraste",
+    },
+    {
+      role: "scene",
+      internalPurpose: "Transformar a dor em cena publica.",
+      eyebrow: "O que acontece",
+      headline: `${customer} percebe antes de falar com voce.`,
+      body: cleanLine(problem, 170),
+      footer: brandName,
+    },
+    {
+      role: "tension",
+      internalPurpose: "Mostrar o custo da dor.",
+      eyebrow: "O custo",
+      headline: "O intervalo cobra caro.",
+      body: "Quando a resposta demora, a confianca cai antes da conversa comecar.",
+      footer: input.typographicPiece.copy.cta,
+    },
+    {
+      role: "mechanism",
+      internalPurpose: "Introduzir a marca como solucao pratica.",
+      eyebrow: brandName,
+      headline: `${brandName} entra antes do problema crescer.`,
+      body: cleanLine(value, 170),
+      footer: brandName,
+    },
+    {
+      role: "proof",
+      internalPurpose: "Explicar a diferenca pratica sem promessa exagerada.",
+      eyebrow: "Na pratica",
+      headline: "Menos improviso. Mais clareza.",
+      body: "A conversa ganha processo sem perder o tom humano da marca.",
+      footer: input.typographicPiece.copy.cta,
+    },
+    {
+      role: "close",
+      internalPurpose: "Fechar com pergunta ou CTA.",
+      eyebrow: brandName,
+      headline: firstPublicQuestion(input) || "Onde a conversa trava hoje?",
+      body: "Esse e o ponto que precisa aparecer antes da proxima campanha.",
+      footer: input.typographicPiece.copy.cta || "Comente ou salve para revisar depois.",
+    },
+  ];
+}
+
+function sanitizeSlideDraft(
+  slide: CarouselSlideDraft,
+  input: CarouselGenerationInput,
+  brandName: string,
+): CarouselSlideDraft {
+  const fallback = publicFallbackForRole(slide.role, input, brandName);
+  const headline = sanitizePublicCopy(slide.headline, fallback.headline, 94);
+  let body = sanitizePublicCopy(slide.body, fallback.body, 180);
+
+  if (isDuplicateCopy(headline, body)) {
+    body = fallback.body;
+  }
+
+  return {
+    ...slide,
+    eyebrow: sanitizePublicCopy(slide.eyebrow, fallback.eyebrow, 34),
+    headline,
+    body,
+    footer: sanitizePublicCopy(slide.footer, fallback.footer, 56),
+  };
+}
+
+function publicFallbackForRole(
+  role: CarouselSlideRole,
+  input: CarouselGenerationInput,
+  brandName: string,
+): Pick<CarouselSlideDraft, "eyebrow" | "headline" | "body" | "footer"> {
+  const cta = input.typographicPiece.copy.cta || brandName;
+
+  if (role === "cover") {
+    return {
+      eyebrow: brandName,
+      headline: input.typographicPiece.copy.headline || input.concept.hook,
+      body: input.typographicPiece.copy.support || input.briefing.mainMessage,
+      footer: "Arraste",
+    };
+  }
+
+  if (role === "scene") {
+    return {
+      eyebrow: "O que acontece",
+      headline: "O problema aparece antes da venda.",
+      body: "O cliente percebe a demora antes de conhecer a solucao.",
+      footer: brandName,
+    };
+  }
+
+  if (role === "tension") {
+    return {
+      eyebrow: "O custo",
+      headline: "Demora tambem comunica.",
+      body: "Quando ninguem assume a conversa, a confianca comeca a cair.",
+      footer: cta,
+    };
+  }
+
+  if (role === "mechanism") {
+    return {
+      eyebrow: brandName,
+      headline: `${brandName} entra antes da conversa esfriar.`,
+      body: "A resposta chega com criterio, tom de marca e passagem para humano quando precisa.",
+      footer: brandName,
+    };
+  }
+
+  if (role === "proof") {
+    return {
+      eyebrow: "Na pratica",
+      headline: "Menos improviso. Mais clareza.",
+      body: "A conversa segue sem depender de alguem estar olhando a tela o tempo todo.",
+      footer: cta,
+    };
+  }
+
+  return {
+    eyebrow: brandName,
+    headline: firstPublicQuestion(input) || "Onde a conversa trava hoje?",
+    body: "Esse e o ponto que precisa aparecer antes da proxima campanha.",
+    footer: cta || "Comente ou salve para revisar depois.",
+  };
+}
+
+function sanitizePublicCopy(value: string, fallback: string, maxLength: number) {
+  const cleaned = cleanLine(value, maxLength);
+
+  if (!cleaned || hasBriefingLanguage(cleaned)) {
+    return cleanLine(fallback, maxLength);
+  }
+
+  return cleaned;
+}
+
+function hasBriefingLanguage(value: string) {
+  const normalized = normalizeForDetection(value);
+
+  return BRIEFING_LANGUAGE.some((pattern) => pattern.test(normalized));
+}
+
+const BRIEFING_LANGUAGE = [
+  /\bmetafora\b/,
+  /\bvirada\b/,
+  /\bfecho\b/,
+  /\bmostrar\b/,
+  /\bmostrando\b/,
+  /\bideia de que\b/,
+  /\bestrutura\b/,
+  /\bnarrativa\b/,
+  /\bdirecao\b/,
+  /\bdirecao visual\b/,
+  /\bprova\b/,
+  /\bmecanismo\b/,
+  /\bconceito\b/,
+  /\bcopy\b/,
+  /\bpost\b/,
+  /\bslide\b/,
+];
+
+function isDuplicateCopy(headline: string, body: string) {
+  const cleanHeadline = normalizeForDetection(headline);
+  const cleanBody = normalizeForDetection(body);
+
+  return (
+    cleanHeadline.length > 12 &&
+    (cleanBody.includes(cleanHeadline) || cleanHeadline.includes(cleanBody))
+  );
+}
+
+function isWhatsappSalesContext(input: CarouselGenerationInput) {
+  const source = normalizeForDetection(
+    [
+      input.brandProfile.brandName,
+      input.brandProfile.businessDescription,
+      input.brandProfile.productOrService,
+      input.brandProfile.valueProposition,
+      input.briefing.topic,
+      input.briefing.mainMessage,
+      input.briefing.context,
+      input.concept.title,
+      input.concept.centralIdea,
+      input.concept.hook,
+      input.typographicPiece.copy.headline,
+      input.typographicPiece.copy.support,
+    ].join(" "),
+  );
+
+  return (
+    source.includes("whatsapp") &&
+    (source.includes("venda") ||
+      source.includes("cliente") ||
+      source.includes("mensagem") ||
+      source.includes("resposta") ||
+      source.includes("atendimento"))
+  );
+}
+
+function firstPublicQuestion(input: CarouselGenerationInput) {
+  const candidates = [
+    input.captionVariant?.firstComment || "",
+    input.captionVariant?.caption || "",
+    input.typographicPiece.copy.cta,
+  ];
+
+  for (const candidate of candidates) {
+    const question = questionFromText(candidate);
+
+    if (question && !hasBriefingLanguage(question)) {
+      return cleanLine(question, 90);
+    }
+  }
+
+  return "";
+}
+
+function publicProblem(input: CarouselGenerationInput) {
+  const candidates = [
+    input.briefing.mainMessage,
+    input.concept.centralIdea,
+    input.typographicPiece.copy.support,
+    firstSentence(input.captionVariant?.caption || ""),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && !hasBriefingLanguage(candidate)) {
+      return cleanLine(candidate, 170);
+    }
+  }
+
+  return "A pessoa sente o problema antes de entender sua oferta.";
+}
+
+function publicValue(input: CarouselGenerationInput, brandName: string) {
+  const candidates = [
+    input.brandProfile.valueProposition,
+    input.brandProfile.productOrService,
+    input.briefing.mainMessage,
+    input.concept.whyItFitsBrand,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && !hasBriefingLanguage(candidate)) {
+      return cleanLine(candidate, 170);
+    }
+  }
+
+  return `${brandName} organiza a resposta sem apagar o tom humano.`;
+}
+
+function inferAudienceSubject(input: CarouselGenerationInput) {
+  const audience = normalizeForDetection(input.brandProfile.audience);
+
+  if (audience.includes("cliente")) {
+    return "O cliente";
+  }
+
+  if (audience.includes("empresa") || audience.includes("negocio")) {
+    return "O negocio";
+  }
+
+  if (audience.includes("time")) {
+    return "O time";
+  }
+
+  return "A pessoa";
 }
 
 function renderCoverSlide(
@@ -356,29 +654,23 @@ function wrapText(value: string, maxChars: number, maxLines: number) {
   return lines.length ? lines.slice(0, maxLines) : [""];
 }
 
-function headlineFromNarrative(value: string | undefined, fallback: string) {
-  const source = cleanLine(value || fallback, 88);
-  const [firstPart] = source.split(/[.:;]/);
-
-  if (firstPart && firstPart.length >= 18) {
-    return firstPart;
-  }
-
-  return source;
-}
-
-function normalizeNarrative(value: string[]) {
-  return value.map((item) => cleanLine(item, 220)).filter(Boolean);
-}
-
 function firstSentence(value: string) {
   return cleanLine(value.split(/[.!?]\s/)[0] || value, 160);
 }
 
-function questionFromCaption(value: string) {
+function questionFromText(value: string) {
   const question = value.match(/([^.!?\n]*\?)/);
 
   return question ? cleanLine(question[1], 160) : "";
+}
+
+function normalizeForDetection(value: string) {
+  return value
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cleanLine(value: string, maxLength: number) {

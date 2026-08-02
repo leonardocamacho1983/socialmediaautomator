@@ -41,6 +41,7 @@ import {
   type GeneratedVisualAsset,
 } from "../../../lib/creative/assets";
 import {
+  carouselSlideRoleLabels,
   carouselSlideToDataUrl,
   renderCarouselSlideSvg,
 } from "../../../lib/creative/carousel";
@@ -1082,7 +1083,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                 />
                 <div>
                   <strong>Slide {slide.index}</strong>
-                  <span>{slide.role}</span>
+                  <span>{carouselSlideRoleLabels[slide.role]}</span>
                 </div>
                 <p>{slide.headline}</p>
               </article>
