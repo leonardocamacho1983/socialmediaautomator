@@ -16,8 +16,10 @@ import {
   buildApprovedPostText,
   buildApprovedPostView,
   createDuplicateProjectFromApprovedPost,
+  deleteApprovedPostCarousel,
   deleteApprovedPostAsset,
   finalizeApprovedPostPackage,
+  generateApprovedPostCarousel,
   getVisualAssetRejectionReason,
   parseApprovedPosts,
   rejectApprovedPostAsset,
@@ -38,6 +40,10 @@ import {
   buildDefaultAssetInstruction,
   type GeneratedVisualAsset,
 } from "../../../lib/creative/assets";
+import {
+  carouselSlideToDataUrl,
+  renderCarouselSlideSvg,
+} from "../../../lib/creative/carousel";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import {
   downloadSvgAsPng,
@@ -430,6 +436,94 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     window.setTimeout(() => setStatus(""), 2400);
   }
 
+  function generateCarousel() {
+    if (!post || !view) {
+      setStatus("Post aprovado incompleto.");
+      return;
+    }
+
+    persistPosts(generateApprovedPostCarousel(posts, post.id));
+    setStatus("Carrossel gerado.");
+    window.setTimeout(() => setStatus(""), 2600);
+  }
+
+  function deleteCarousel() {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(deleteApprovedPostCarousel(posts, post.id));
+    setStatus("Carrossel apagado.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
+  async function downloadCarouselZip() {
+    if (!post || !view || !post.carouselPackage) {
+      setStatus("Gere o carrossel antes de baixar o ZIP.");
+      return;
+    }
+
+    setStatus("Montando ZIP do carrossel...");
+
+    try {
+      const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}-carrossel`;
+      const files: ZipDownloadFile[] = [];
+
+      for (const slide of post.carouselPackage.slides) {
+        const svg = renderCarouselSlideSvg(
+          post.carouselPackage,
+          slide,
+          view.brand,
+        );
+        const pngBlob = await svgToPngBlob(svg);
+
+        files.push({
+          name: `slides/slide-${String(slide.index).padStart(2, "0")}.png`,
+          content: pngBlob,
+        });
+      }
+
+      files.push(
+        {
+          name: "copy/legenda.txt",
+          content: view.caption,
+        },
+        {
+          name: "copy/primeiro-comentario.txt",
+          content: view.firstComment || "",
+        },
+        {
+          name: "copy/hashtags.txt",
+          content: view.hashtags || "",
+        },
+        {
+          name: "roteiro.txt",
+          content: buildCarouselScript(post),
+        },
+        {
+          name: "metadata.json",
+          content: JSON.stringify(
+            {
+              postId: post.id,
+              title: post.title,
+              brandName: post.brandName,
+              carouselPackage: post.carouselPackage,
+            },
+            null,
+            2,
+          ),
+        },
+      );
+
+      await downloadZipFile(files, `${baseFileName}.zip`);
+      persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
+      setStatus("ZIP do carrossel exportado.");
+      window.setTimeout(() => setStatus(""), 2600);
+    } catch {
+      setStatus("Nao foi possivel baixar o carrossel.");
+    }
+  }
+
   if (!post) {
     return (
       <main className="brand-shell approved-detail-shell">
@@ -446,7 +540,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </Link>
           </div>
           <div>
-            <p className="eyebrow">Marco 4.2</p>
+            <p className="eyebrow">Marco 5</p>
             <h1>Post nao encontrado</h1>
             <p className="lead">
               Este post nao existe na biblioteca local deste navegador.
@@ -483,12 +577,12 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 4.2</p>
+          <p className="eyebrow">Marco 5</p>
           <h1>{post.title}</h1>
           <p className="lead">
             Revisao individual do post aprovado, com escolha de asset,
-            composicao visual e aprovacao final. Ainda sem publicacao, Zernio,
-            banco de dados ou automacao.
+            composicao visual, aprovacao final e primeiro carrossel. Ainda sem
+            publicacao, Zernio, banco de dados ou automacao.
           </p>
         </div>
       </header>
@@ -921,6 +1015,90 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         </p>
       </section>
 
+      <section className="approved-detail-card carousel-card">
+        <div className="asset-section-heading">
+          <div>
+            <p className="section-kicker">Marco 5</p>
+            <h2>Carrossel do post</h2>
+          </div>
+          <span
+            className={
+              post.carouselPackage
+                ? "carousel-status carousel-status-ready"
+                : "carousel-status"
+            }
+          >
+            {post.carouselPackage ? "Carrossel gerado" : "Sem carrossel"}
+          </span>
+        </div>
+
+        <p className="approved-detail-muted">
+          Esta primeira versao transforma o conceito escolhido em seis slides
+          1080x1350. Ainda e deterministica: nao usa Recraft, video, publicacao
+          ou automacao.
+        </p>
+
+        <div className="approved-detail-actions">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={generateCarousel}
+            disabled={!view}
+          >
+            {post.carouselPackage ? "Regenerar carrossel" : "Gerar carrossel"}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={downloadCarouselZip}
+            disabled={!view || !post.carouselPackage}
+          >
+            Baixar ZIP do carrossel
+          </button>
+          {post.carouselPackage ? (
+            <button
+              className="secondary-button secondary-danger"
+              type="button"
+              onClick={deleteCarousel}
+            >
+              Apagar carrossel
+            </button>
+          ) : null}
+        </div>
+
+        {post.carouselPackage && view ? (
+          <div className="carousel-preview-grid" aria-label="Slides gerados">
+            {post.carouselPackage.slides.map((slide) => (
+              <article className="carousel-slide-card" key={slide.id}>
+                <img
+                  alt={`Slide ${slide.index}: ${slide.headline}`}
+                  height={1350}
+                  src={carouselSlideToDataUrl(
+                    post.carouselPackage!,
+                    slide,
+                    view.brand,
+                  )}
+                  width={1080}
+                />
+                <div>
+                  <strong>Slide {slide.index}</strong>
+                  <span>{slide.role}</span>
+                </div>
+                <p>{slide.headline}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="carousel-empty">
+            <strong>Nenhum roteiro de carrossel criado ainda.</strong>
+            <p>
+              Gere o carrossel depois de aprovar o pacote final para testar se o
+              mesmo conceito tambem funciona como sequencia.
+            </p>
+          </div>
+        )}
+      </section>
+
       <section className="approved-detail-copy-grid">
         <article className="approved-detail-card">
           <p className="section-kicker">Legenda</p>
@@ -1140,6 +1318,28 @@ function buildFinalPackageReadme(post: ApprovedPost) {
     "- asset/selected-asset.png, quando houver asset selecionado",
     "- metadata.json",
     "- visual-history.json",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildCarouselScript(post: ApprovedPost) {
+  if (!post.carouselPackage) {
+    return "";
+  }
+
+  return [
+    `Carrossel: ${post.title}`,
+    `Marca: ${post.brandName}`,
+    `Gerado em: ${new Date(post.carouselPackage.generatedAt).toLocaleString("pt-BR")}`,
+    "",
+    ...post.carouselPackage.slides.flatMap((slide) => [
+      `Slide ${slide.index} - ${slide.eyebrow}`,
+      slide.headline,
+      slide.body,
+      slide.footer ? `Rodape: ${slide.footer}` : "",
+      "",
+    ]),
   ]
     .filter(Boolean)
     .join("\n");

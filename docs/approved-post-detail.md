@@ -1,11 +1,11 @@
-# Marco 4.2 Approved Post Detail
+# Marco 5 Approved Post Detail
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 4.2 keeps the individual review page for each locally approved post and
-adds final package controls.
+Marco 5 keeps the individual review page for each locally approved post and
+adds a deterministic carousel package generated from the approved concept.
 
 Included:
 
@@ -29,6 +29,10 @@ Included:
 - finalize the post package;
 - download a ZIP with final PNG, copy, metadata, and visual history;
 - show the visual event history.
+- generate a six-slide 1080x1350 carousel package;
+- preview each carousel slide in the detail page;
+- download a ZIP with carousel PNGs, script, copy, and metadata;
+- delete and regenerate the carousel package.
 
 Not included:
 
@@ -37,7 +41,7 @@ Not included:
 - scheduling or publishing;
 - analytics;
 - comment or DM automation;
-- carousels.
+- Reels or video.
 
 ## Local Storage Contract
 
@@ -54,10 +58,10 @@ are normalized to an empty string when read.
 Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Marco 4.1 adds
 `selectedAssetCompositionId`, `visualStatus`, `visualApprovedAt`, and
 `visualAssetRejections`. Marco 4.2 adds `visualEvents`,
-`finalPackageStatus`, and `finalPackageReadyAt`. Older records without asset
-fields are normalized to an empty asset list, no selected asset, the default
-composition, typographic-only visual status, empty visual history, and package
-status open.
+`finalPackageStatus`, and `finalPackageReadyAt`. Marco 5 adds
+`carouselPackage`. Older records without asset fields are normalized to an empty
+asset list, no selected asset, the default composition, typographic-only visual
+status, empty visual history, package status open, and no carousel package.
 
 This is still browser-local state. It is not a durable production content
 database.
@@ -90,3 +94,6 @@ Manual validation:
     automatically if it was not approved before.
 11. Download the ZIP and confirm it includes final image, copy files, metadata,
     and visual history.
+12. Generate the carousel and confirm six slide previews appear.
+13. Download the carousel ZIP and confirm it includes six PNG slides, copy,
+    script, and metadata.

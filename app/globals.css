@@ -1118,7 +1118,7 @@ h2 {
 
 .approved-visual-cockpit {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -1340,6 +1340,24 @@ h2 {
   border-color: #101514;
   background: #101514;
   color: #eaf3ee;
+}
+
+.carousel-status {
+  width: fit-content;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--muted);
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.carousel-status-ready {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, #ffffff);
+  color: var(--accent-strong);
 }
 
 .approved-post-copy {
@@ -1757,6 +1775,79 @@ h2 {
   margin-top: 20px;
 }
 
+.carousel-card {
+  margin-top: 20px;
+}
+
+.carousel-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.carousel-slide-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 12px;
+}
+
+.carousel-slide-card img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+  background: var(--surface-muted);
+  object-fit: cover;
+}
+
+.carousel-slide-card div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.carousel-slide-card strong {
+  font-size: 0.92rem;
+}
+
+.carousel-slide-card span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.carousel-slide-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.carousel-empty {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.carousel-empty strong {
+  font-size: 0.95rem;
+}
+
+.carousel-empty p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .final-package-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1852,7 +1943,8 @@ h2 {
   .approved-detail-copy-grid,
   .approved-detail-checklist,
   .asset-workbench,
-  .asset-card-grid {
+  .asset-card-grid,
+  .carousel-preview-grid {
     grid-template-columns: 1fr;
   }
 

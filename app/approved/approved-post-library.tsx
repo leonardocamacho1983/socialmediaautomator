@@ -81,6 +81,10 @@ export function ApprovedPostLibrary() {
     () => posts.filter((post) => post.finalPackageStatus === "ready").length,
     [posts],
   );
+  const carouselCount = useMemo(
+    () => posts.filter((post) => post.carouselPackage).length,
+    [posts],
+  );
   const normalizedSearchTerm = normalizeSearchText(searchTerm);
   const visiblePosts = useMemo(
     () =>
@@ -180,12 +184,12 @@ export function ApprovedPostLibrary() {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 4.2</p>
+          <p className="eyebrow">Marco 5</p>
           <h1>Posts aprovados</h1>
           <p className="lead">
-            Cockpit local dos pacotes finais aprovados, agora com status visual
-            e pacotes prontos para exportacao. Ainda sem Zernio, calendario,
-            publicacao, banco de dados ou automacao.
+            Cockpit local dos pacotes finais aprovados, agora com status visual,
+            pacotes prontos para exportacao e carrossel deterministico. Ainda
+            sem Zernio, calendario, publicacao, banco de dados ou automacao.
           </p>
         </div>
       </header>
@@ -282,6 +286,10 @@ export function ApprovedPostLibrary() {
           <span>{finalPackageStatusLabels.ready}</span>
           <strong>{readyPackageCount}</strong>
         </div>
+        <div className="approved-visual-metric">
+          <span>Com carrossel</span>
+          <strong>{carouselCount}</strong>
+        </div>
       </section>
 
       <section className="approved-filter-panel" aria-label="Filtros">
@@ -369,6 +377,11 @@ export function ApprovedPostLibrary() {
                     >
                       {finalPackageStatusLabels[post.finalPackageStatus]}
                     </span>
+                    {post.carouselPackage ? (
+                      <span className="carousel-status carousel-status-ready">
+                        Carrossel
+                      </span>
+                    ) : null}
                     <strong>{post.title}</strong>
                     <small>
                       {post.brandName} -{" "}

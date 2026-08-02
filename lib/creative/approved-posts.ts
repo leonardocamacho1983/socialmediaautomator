@@ -7,6 +7,10 @@ import {
 } from "./asset-composition";
 import type { GeneratedVisualAsset } from "./assets";
 import { getSelectedCaptionVariant, type CaptionPackage } from "./captions";
+import {
+  createCarouselPackage,
+  type CarouselPackage,
+} from "./carousel";
 import type { CreativeConcept, CreativeProject } from "./concepts";
 import {
   getSelectedTypographicVariant,
@@ -107,6 +111,7 @@ export type ApprovedPost = {
   status: ApprovedPostStatus;
   finalPackageStatus: ApprovedPostFinalPackageStatus;
   finalPackageReadyAt: string | null;
+  carouselPackage: CarouselPackage | null;
   notes: string;
   generatedAssets: GeneratedVisualAsset[];
   selectedVisualAssetId: string | null;
@@ -130,6 +135,7 @@ type StoredApprovedPost = Omit<
   | "visualEvents"
   | "finalPackageStatus"
   | "finalPackageReadyAt"
+  | "carouselPackage"
 > & {
   notes?: string;
   generatedAssets?: GeneratedVisualAsset[];
@@ -141,6 +147,7 @@ type StoredApprovedPost = Omit<
   visualEvents?: ApprovedPostVisualEvent[];
   finalPackageStatus?: string | null;
   finalPackageReadyAt?: string | null;
+  carouselPackage?: CarouselPackage | null;
 };
 
 export function createApprovedPostFromProject(
@@ -164,6 +171,7 @@ export function createApprovedPostFromProject(
     status: "approved",
     finalPackageStatus: "open",
     finalPackageReadyAt: null,
+    carouselPackage: null,
     notes: "",
     generatedAssets: [],
     selectedVisualAssetId: null,
@@ -220,6 +228,9 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
           typeof post.finalPackageReadyAt === "string"
             ? post.finalPackageReadyAt
             : null,
+        carouselPackage: isCarouselPackage(post.carouselPackage)
+          ? post.carouselPackage
+          : null,
       };
     });
 }
@@ -246,6 +257,7 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
           visualEvents: item.visualEvents || [],
           finalPackageStatus: item.finalPackageStatus || "open",
           finalPackageReadyAt: item.finalPackageReadyAt || null,
+          carouselPackage: item.carouselPackage || null,
         }
       : item,
   );
@@ -579,6 +591,56 @@ export function finalizeApprovedPostPackage(
   });
 }
 
+export function generateApprovedPostCarousel(
+  posts: ApprovedPost[],
+  postId: string,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId) {
+      return post;
+    }
+
+    const concept = getApprovedPostConcept(post);
+    const typographicPiece = getApprovedPostTypographicPiece(post);
+    const captionPackage = getApprovedPostCaptionPackage(post);
+    const captionVariant = captionPackage
+      ? getSelectedCaptionVariant(captionPackage)
+      : null;
+
+    if (!concept || !typographicPiece) {
+      return post;
+    }
+
+    return {
+      ...post,
+      carouselPackage: createCarouselPackage({
+        postId: post.id,
+        brandProfile: post.projectSnapshot.brandSnapshot,
+        briefing: post.projectSnapshot.briefing,
+        concept,
+        typographicPiece,
+        captionVariant,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+export function deleteApprovedPostCarousel(
+  posts: ApprovedPost[],
+  postId: string,
+): ApprovedPost[] {
+  return posts.map((post) =>
+    post.id === postId
+      ? {
+          ...post,
+          carouselPackage: null,
+          updatedAt: new Date().toISOString(),
+        }
+      : post,
+  );
+}
+
 export function getVisualAssetRejectionReason(
   reasonId: VisualAssetRejectionReasonId,
 ) {
@@ -701,6 +763,7 @@ export function buildApprovedPostSearchText(post: ApprovedPost) {
     post.notes,
     post.status,
     post.finalPackageStatus,
+    post.carouselPackage?.slides.map((slide) => `${slide.headline} ${slide.body}`).join(" "),
     post.visualStatus,
     post.selectedAssetCompositionId,
     concept?.title,
@@ -825,6 +888,23 @@ function normalizeVisualEvents(value: unknown) {
   }
 
   return value.filter(isApprovedPostVisualEvent).slice(0, 48);
+}
+
+function isCarouselPackage(value: unknown): value is CarouselPackage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.postId === "string" &&
+    typeof candidate.conceptId === "string" &&
+    typeof candidate.generatedAt === "string" &&
+    candidate.format === "4:5" &&
+    Array.isArray(candidate.slides)
+  );
 }
 
 function resolveVisualStatus(context: {
