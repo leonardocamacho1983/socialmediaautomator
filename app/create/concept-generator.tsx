@@ -24,6 +24,13 @@ import {
   type CreativeProject,
 } from "../../lib/creative/concepts";
 import {
+  APPROVED_POSTS_STORAGE_KEY,
+  createApprovedPostFromProject,
+  parseApprovedPosts,
+  upsertApprovedPost,
+  type ApprovedPost,
+} from "../../lib/creative/approved-posts";
+import {
   reviewCaptionForInstagram,
   type CaptionPackage,
   type CaptionVariantId,
@@ -159,6 +166,49 @@ export function ConceptGenerator() {
       JSON.stringify(nextProject),
     );
     setProject(nextProject);
+  }
+
+  function persistApprovedPost(
+    nextProject: CreativeProject,
+    concept: CreativeConcept,
+  ) {
+    const approvedPost = createApprovedPostFromProject(nextProject, concept);
+
+    if (!approvedPost) {
+      return;
+    }
+
+    let currentPosts: ApprovedPost[] = [];
+
+    try {
+      const storedPosts = window.localStorage.getItem(
+        APPROVED_POSTS_STORAGE_KEY,
+      );
+      currentPosts = parseApprovedPosts(
+        storedPosts ? JSON.parse(storedPosts) : [],
+      );
+    } catch {
+      currentPosts = [];
+    }
+
+    window.localStorage.setItem(
+      APPROVED_POSTS_STORAGE_KEY,
+      JSON.stringify(upsertApprovedPost(currentPosts, approvedPost)),
+    );
+  }
+
+  function startNewPost() {
+    window.localStorage.removeItem(CREATIVE_PROJECT_STORAGE_KEY);
+    setProject(null);
+    setBriefing(emptyCreativeBriefing);
+    setError("");
+    setCaptionError("");
+    setTypographicRegenerationInstruction("");
+    setCaptionRegenerationInstruction("");
+    setStatus("Novo post iniciado. Preencha o briefing.");
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
 
   function updateBriefing<K extends keyof CreativeBriefing>(
@@ -483,14 +533,19 @@ export function ConceptGenerator() {
   }
 
   function approveFinalPostPackage(checklist: FinalPostChecklistItem[]) {
-    if (!project || !selectedConcept || !activeTypographicPiece || !activeCaptionPackage) {
+    if (
+      !project ||
+      !selectedConcept ||
+      !activeTypographicPiece ||
+      !activeCaptionPackage
+    ) {
       return;
     }
 
     const nextProject: CreativeProject = {
       ...project,
       finalPostPackage: {
-        id: `final-post-${Date.now()}`,
+        id: `final-post-${project.id}-${selectedConcept.id}`,
         conceptId: selectedConcept.id,
         typographicPieceId: activeTypographicPiece.id,
         typographicVariantId: activeTypographicPiece.selectedVariantId,
@@ -502,7 +557,8 @@ export function ConceptGenerator() {
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
-    setStatus("Pacote final aprovado.");
+    persistApprovedPost(nextProject, selectedConcept);
+    setStatus("Pacote final aprovado e salvo na biblioteca.");
   }
 
   return (
@@ -514,6 +570,9 @@ export function ConceptGenerator() {
           </Link>
           <Link className="text-link" href="/brand">
             Brand Foundation
+          </Link>
+          <Link className="text-link" href="/approved">
+            Posts aprovados
           </Link>
         </div>
         <div>
@@ -670,7 +729,7 @@ export function ConceptGenerator() {
                 </h3>
                 <p>
                   {activeFinalPostPackage
-                    ? "O pacote final foi aprovado com imagem, legenda, primeiro comentario, hashtags e checklist."
+                    ? "O pacote final foi aprovado e salvo na biblioteca local de posts aprovados."
                     : activeCaptionPackage
                       ? "Revise o pacote final do post antes de considerar esta peca pronta para uso."
                     : activeTypographicPiece
@@ -689,7 +748,9 @@ export function ConceptGenerator() {
                   <div>
                     <dt>Saida</dt>
                     <dd>
-                      {activeCaptionPackage
+                      {activeFinalPostPackage
+                        ? "Biblioteca local de posts aprovados"
+                        : activeCaptionPackage
                         ? "Pacote final do post"
                         : activeTypographicPiece
                           ? "3 opcoes de legenda"
@@ -697,7 +758,14 @@ export function ConceptGenerator() {
                     </dd>
                   </div>
                 </dl>
-                {activeCaptionPackage ? (
+                {activeFinalPostPackage ? (
+                  <Link
+                    className="primary-button next-step-button"
+                    href="/approved"
+                  >
+                    Ver posts aprovados
+                  </Link>
+                ) : activeCaptionPackage ? (
                   <a
                     className="primary-button next-step-button"
                     href="#final-post-package"
@@ -885,6 +953,7 @@ export function ConceptGenerator() {
           selectedConcept={selectedConcept}
           typographicPiece={activeTypographicPiece}
           onApprove={approveFinalPostPackage}
+          onCreateNewPost={startNewPost}
         />
       ) : null}
     </main>

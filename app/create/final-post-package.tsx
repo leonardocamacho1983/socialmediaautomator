@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- final preview uses local SVG data URLs generated in the browser */
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { BrandProfile } from "../../lib/brand/profile";
 import type {
   CreativeConcept,
@@ -31,6 +32,7 @@ type FinalPostPackageProps = {
   captionPackage: CaptionPackage;
   finalPostPackage: FinalPostPackage | null;
   onApprove: (checklist: FinalPostChecklistItem[]) => void;
+  onCreateNewPost: () => void;
 };
 
 const statusLabels: Record<FinalPostChecklistItem["status"], string> = {
@@ -45,6 +47,7 @@ export function FinalPostPackageWorkshop({
   captionPackage,
   finalPostPackage,
   onApprove,
+  onCreateNewPost,
 }: FinalPostPackageProps) {
   const [status, setStatus] = useState("");
   const selectedTypographicVariant =
@@ -231,6 +234,21 @@ export function FinalPostPackageWorkshop({
             <span className="next-step-status" role="status">
               {status}
             </span>
+          ) : null}
+
+          {finalPostPackage ? (
+            <div className="final-next-actions">
+              <Link className="primary-button" href="/approved">
+                Ver posts aprovados
+              </Link>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={onCreateNewPost}
+              >
+                Criar novo post
+              </button>
+            </div>
           ) : null}
         </aside>
       </div>

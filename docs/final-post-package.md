@@ -15,6 +15,7 @@ Included:
 - provides a final quality checklist;
 - lets the user approve or reapprove the final package;
 - stores the approval state in browser `localStorage`;
+- saves approved packages into the local approved posts library at `/approved`;
 - invalidates the approval when the visual piece, caption, first comment,
   hashtags, or review changes;
 - exports the selected image as PNG;
@@ -65,7 +66,9 @@ Then validate `/create` with a selected concept, typographic piece, and caption:
    together.
 3. Click `Aprovar pacote final`.
 4. Confirm the state changes to `Post aprovado`.
-5. Copy the caption, first comment, and full package.
-6. Click `Baixar PNG`.
-7. Edit the caption or visual copy.
-8. Confirm the final approval is cleared.
+5. Confirm `Ver posts aprovados` appears.
+6. Open `/approved` and confirm the package is listed.
+7. Copy the caption, first comment, and full package.
+8. Click `Baixar PNG`.
+9. Edit the caption or visual copy.
+10. Confirm the final approval is cleared.

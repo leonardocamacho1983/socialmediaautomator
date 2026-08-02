@@ -3,6 +3,7 @@ const checks = [
   "Marco 1 com perfil de marca local",
   "Marco 2 com gerador de conceitos",
   "Marco 3.2 com pacote final de post tipografico",
+  "Marco 3.3 com biblioteca local de posts aprovados",
   "Sem imagens geradas, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];
@@ -29,6 +30,9 @@ export default function Home() {
           </a>
           <a className="primary-link secondary-accent" href="/create">
             Gerar conceitos
+          </a>
+          <a className="primary-link" href="/approved">
+            Ver aprovados
           </a>
           <a className="health-link" href="/api/health">
             Ver health check
