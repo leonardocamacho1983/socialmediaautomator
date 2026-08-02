@@ -27,6 +27,12 @@ The model prompt explicitly asks for visual-only output. Text, letters, logos,
 captions, watermarks, and UI labels must stay out of the generated image because
 the app renders copy and brand elements itself.
 
+The image-led renderer uses its own composition rules. It keeps the generated
+asset as the visual subject, places the copy in a single lower text panel, and
+keeps brand name, headline, support copy, and CTA inside that same hierarchy.
+The renderer should not duplicate the brand name in the footer or leave support
+copy and CTA floating over the image.
+
 ## Not Included
 
 - Supabase persistence;

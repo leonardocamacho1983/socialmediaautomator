@@ -14,58 +14,62 @@ export function renderAssetCompositeSvg(
 ) {
   const palette = buildPalette(brandProfile);
   const font = buildFontFamilies(brandProfile);
-  const headlineLines = wrapText(piece.copy.headline, 16, 5);
-  const supportLines = wrapText(piece.copy.support, 32, 4);
-  const ctaLines = wrapText(piece.copy.cta, 32, 2);
+  const headlineLines = wrapText(piece.copy.headline, 23, 4);
+  const supportLines = wrapText(piece.copy.support, 54, 2);
+  const ctaLines = wrapText(piece.copy.cta, 30, 1);
   const isConversationVariant = variant.id === "conversation-clean";
-  const blockX = isConversationVariant ? 86 : 74;
-  const blockY = isConversationVariant ? 650 : 604;
-  const blockWidth = isConversationVariant ? 908 : 884;
+  const panelX = isConversationVariant ? 88 : 84;
+  const panelY = isConversationVariant ? 640 : 626;
+  const panelWidth = isConversationVariant ? 904 : 912;
+  const panelHeight = isConversationVariant ? 526 : 548;
+  const panelPaddingX = 42;
+  const headlineSize =
+    headlineLines.length >= 4 ? 60 : headlineLines.length === 3 ? 68 : 78;
+  const headlineLineHeight = headlineSize + 8;
+  const headlineY = panelY + 176;
+  const supportY =
+    headlineY + Math.max(1, headlineLines.length) * headlineLineHeight + 44;
+  const footerY = panelY + panelHeight - 50;
 
   return svgShell(`
     <defs>
       <linearGradient id="assetOverlay" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${palette.text}" stop-opacity="0.16" />
-        <stop offset="48%" stop-color="${palette.text}" stop-opacity="0.2" />
-        <stop offset="100%" stop-color="${palette.text}" stop-opacity="0.72" />
+        <stop offset="0%" stop-color="${palette.text}" stop-opacity="0.04" />
+        <stop offset="56%" stop-color="${palette.text}" stop-opacity="0.12" />
+        <stop offset="100%" stop-color="${palette.text}" stop-opacity="0.48" />
       </linearGradient>
     </defs>
     <rect width="1080" height="1350" fill="${palette.background}" />
     <image href="${escapeAttribute(asset.dataUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" />
     <rect width="1080" height="1350" fill="url(#assetOverlay)" />
-    <rect x="${blockX}" y="${blockY}" width="${blockWidth}" height="540" rx="0" fill="${palette.primary}" opacity="0.9" />
-    <rect x="${blockX}" y="${blockY}" width="12" height="540" fill="${palette.accent}" />
-    <text x="${blockX + 36}" y="${blockY + 68}" ${font.body} font-size="28" font-weight="850" fill="${palette.light}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
+    <rect x="${panelX}" y="${panelY}" width="${panelWidth}" height="${panelHeight}" rx="0" fill="${palette.primary}" fill-opacity="0.91" />
+    <rect x="${panelX}" y="${panelY}" width="12" height="${panelHeight}" fill="${palette.accent}" />
+    <text x="${panelX + panelPaddingX}" y="${panelY + 66}" ${font.body} font-size="28" font-weight="850" fill="${palette.light}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
     ${renderTextLines({
       lines: headlineLines,
-      x: blockX + 36,
-      y: blockY + 176,
-      size: 74,
-      lineHeight: 80,
+      x: panelX + panelPaddingX,
+      y: headlineY,
+      size: headlineSize,
+      lineHeight: headlineLineHeight,
       weight: 900,
       fill: palette.light,
       font: font.heading,
     })}
     ${renderTextLines({
       lines: supportLines,
-      x: blockX + 36,
-      y: blockY + 176 + headlineLines.length * 80 + 60,
-      size: 34,
-      lineHeight: 44,
+      x: panelX + panelPaddingX,
+      y: supportY,
+      size: 31,
+      lineHeight: 39,
       weight: 720,
       fill: palette.light,
       font: font.body,
     })}
-    ${renderBrandMark(brandProfile, {
-      x: 76,
-      y: 1266,
-      fill: palette.light,
-      font,
-    })}
+    <rect x="${panelX + panelWidth - 262}" y="${footerY - 36}" width="220" height="54" rx="27" fill="${palette.text}" fill-opacity="0.16" />
     ${renderTextLines({
       lines: ctaLines,
-      x: 1004,
-      y: 1266,
+      x: panelX + panelWidth - 66,
+      y: footerY,
       size: 28,
       lineHeight: 36,
       weight: 820,
@@ -109,22 +113,6 @@ function renderTextLines({
         `<text x="${x}" y="${y + index * lineHeight}" ${font} font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}">${escapeXml(line)}</text>`,
     )
     .join("");
-}
-
-function renderBrandMark(
-  brandProfile: BrandProfile,
-  options: {
-    x: number;
-    y: number;
-    fill: string;
-    font: FontFamilies;
-  },
-) {
-  if (brandProfile.logoDataUrl) {
-    return `<image href="${escapeAttribute(brandProfile.logoDataUrl)}" x="${options.x}" y="${options.y - 58}" width="168" height="72" preserveAspectRatio="xMinYMid meet" />`;
-  }
-
-  return `<text x="${options.x}" y="${options.y}" ${options.font.body} font-size="30" font-weight="900" fill="${options.fill}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>`;
 }
 
 function wrapText(value: string, maxChars: number, maxLines: number) {

@@ -58,7 +58,9 @@ export function buildVisualAssetPrompt(input: VisualAssetGenerationInput) {
 
   return compactLines([
     "Create a vertical 4:5 editorial visual asset for an Instagram post.",
-    "The image is only the visual layer. Do not include text, letters, numbers, captions, UI labels, logos, or watermarks.",
+    "The image is only the visual layer. Do not include text, letters, numbers, captions, UI labels, logos, notification badges, counters, clocks, price tags, dashboard labels, watermarks, or readable symbols.",
+    "This must not look like a literal app screenshot or UI mockup. If messaging apps are referenced, represent them as generic abstract conversation shapes, not as branded interface screens.",
+    "Place the main subject in the upper half of the frame. Keep the lower 42% calm and uncluttered so a dark translucent text panel can be placed there.",
     "Leave clean negative space for headline and caption overlay. Avoid busy details behind the future text area.",
     "Use a polished marketing/editorial look, not stock-photo blandness.",
     `Brand: ${input.brandProfile.brandName || "Social Studio"}.`,
@@ -67,7 +69,7 @@ export function buildVisualAssetPrompt(input: VisualAssetGenerationInput) {
     `Concept title: ${input.selectedConcept.title}.`,
     `Concept hook: ${input.selectedConcept.hook}.`,
     `Visual direction: ${direction}.`,
-    "Avoid direct trademark logos. If messaging apps or chat are referenced, use generic chat shapes and abstract conversation cues.",
+    "Avoid direct trademark logos. If WhatsApp, Instagram, LinkedIn, chat, or messaging are referenced, translate that into generic chat shapes and abstract conversation cues.",
   ]);
 }
 
