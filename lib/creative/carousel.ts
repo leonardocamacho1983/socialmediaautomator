@@ -33,18 +33,18 @@ export type CarouselPackage = {
   conceptId: string;
   generatedAt: string;
   format: "4:5";
-  renderer: "deterministic-carousel-v2";
+  renderer: "deterministic-carousel-v3";
   slides: CarouselSlide[];
 };
 
-export const CURRENT_CAROUSEL_RENDERER = "deterministic-carousel-v2";
+export const CURRENT_CAROUSEL_RENDERER = "deterministic-carousel-v3";
 
 export const carouselSlideRoleLabels: Record<CarouselSlideRole, string> = {
   cover: "Capa",
   scene: "Cena",
   tension: "Custo",
   mechanism: "Como muda",
-  proof: "Na pratica",
+  proof: "Na prática",
   close: "Fechamento",
 };
 
@@ -129,7 +129,7 @@ function buildWhatsappSalesCarousel(
   return [
     {
       role: "cover",
-      internalPurpose: "Abrir com o hook aprovado sem explicar a estrategia.",
+      internalPurpose: "Abrir com o hook aprovado sem explicar a estratégia.",
       eyebrow: brandName,
       headline: cleanLine(input.typographicPiece.copy.headline, 92),
       body: cleanLine(input.typographicPiece.copy.support, 132),
@@ -139,40 +139,40 @@ function buildWhatsappSalesCarousel(
       role: "scene",
       internalPurpose: "Colocar uma cena concreta de WhatsApp parado.",
       eyebrow: "O que acontece",
-      headline: "O cliente mandou mensagem.",
-      body: "Ele nao esta navegando. Esta decidindo se espera voce ou chama outro.",
+      headline: "O cliente chamou. Ninguém respondeu.",
+      body: "Ele não está navegando. Está decidindo se espera você ou chama outro.",
       footer: brandName,
     },
     {
       role: "tension",
-      internalPurpose: "Mostrar a consequencia comercial da demora.",
+      internalPurpose: "Mostrar a consequência comercial da demora.",
       eyebrow: "O custo",
-      headline: "Demora tambem comunica.",
-      body: "Quando ninguem responde, o cliente entende que a venda nao e prioridade.",
+      headline: "Para você, foram só alguns minutos.",
+      body: "Para ele, foi tempo suficiente para procurar outra empresa.",
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "mechanism",
-      internalPurpose: "Introduzir a marca como mecanismo pratico.",
+      internalPurpose: "Introduzir a marca como mecanismo prático.",
       eyebrow: brandName,
-      headline: `${brandName} entra antes da conversa esfriar.`,
-      body: "Responde no tom do negocio e chama uma pessoa quando o assunto pede.",
+      headline: `${brandName} responde antes da conversa esfriar.`,
+      body: "Responde no tom do seu negócio e chama uma pessoa quando precisa.",
       footer: brandName,
     },
     {
       role: "proof",
-      internalPurpose: "Diferenciar de chatbot generico.",
-      eyebrow: "Na pratica",
-      headline: "Nao e robo pedindo cadastro.",
-      body: "E atendimento treinado para manter a conversa viva ate o humano assumir.",
+      internalPurpose: "Diferenciar de chatbot genérico.",
+      eyebrow: "Na prática",
+      headline: "Não é robô empurrando formulário.",
+      body: "É atendimento treinado para manter a conversa viva até o humano assumir.",
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "close",
-      internalPurpose: "Fechar com pergunta que puxa comentario ou reflexao.",
+      internalPurpose: "Fechar com pergunta que puxa comentário ou reflexão.",
       eyebrow: brandName,
-      headline: firstPublicQuestion(input) || "Quantas conversas estao paradas agora?",
-      body: "Olhe seu WhatsApp. Se a resposta demorou, a venda ja comecou a esfriar.",
+      headline: "Hoje, quem segura seu WhatsApp quando você não está online?",
+      body: "Olhe agora. Se a resposta demorou, a venda já começou a esfriar.",
       footer: input.typographicPiece.copy.cta || "Comente ou salve para revisar depois.",
     },
   ];
@@ -197,9 +197,9 @@ function buildGenericCarousel(
     },
     {
       role: "scene",
-      internalPurpose: "Transformar a dor em cena publica.",
+      internalPurpose: "Transformar a dor em cena pública.",
       eyebrow: "O que acontece",
-      headline: `${customer} percebe antes de falar com voce.`,
+      headline: `${customer} percebe antes de falar com você.`,
       body: cleanLine(problem, 170),
       footer: brandName,
     },
@@ -208,12 +208,12 @@ function buildGenericCarousel(
       internalPurpose: "Mostrar o custo da dor.",
       eyebrow: "O custo",
       headline: "O intervalo cobra caro.",
-      body: "Quando a resposta demora, a confianca cai antes da conversa comecar.",
+      body: "Quando a resposta demora, a confiança cai antes da conversa começar.",
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "mechanism",
-      internalPurpose: "Introduzir a marca como solucao pratica.",
+      internalPurpose: "Introduzir a marca como solução prática.",
       eyebrow: brandName,
       headline: `${brandName} entra antes do problema crescer.`,
       body: cleanLine(value, 170),
@@ -222,7 +222,7 @@ function buildGenericCarousel(
     {
       role: "proof",
       internalPurpose: "Explicar a diferenca pratica sem promessa exagerada.",
-      eyebrow: "Na pratica",
+      eyebrow: "Na prática",
       headline: "Menos improviso. Mais clareza.",
       body: "A conversa ganha processo sem perder o tom humano da marca.",
       footer: input.typographicPiece.copy.cta,
@@ -321,10 +321,14 @@ function publicFallbackForRole(
 }
 
 function sanitizePublicCopy(value: string, fallback: string, maxLength: number) {
-  const cleaned = cleanLine(value, maxLength);
+  const cleaned = cleanLine(applyPortugueseQualityGate(value), maxLength);
 
-  if (!cleaned || hasBriefingLanguage(cleaned)) {
-    return cleanLine(fallback, maxLength);
+  if (
+    !cleaned ||
+    hasBriefingLanguage(cleaned) ||
+    hasWeakCarouselCopy(cleaned)
+  ) {
+    return cleanLine(applyPortugueseQualityGate(fallback), maxLength);
   }
 
   return cleaned;
@@ -354,6 +358,24 @@ const BRIEFING_LANGUAGE = [
   /\bpost\b/,
   /\bslide\b/,
 ];
+
+const WEAK_CAROUSEL_COPY = [
+  /\bo cliente mandou mensagem\b/,
+  /\bdemora tambem comunica\b/,
+  /\bdemora também comunica\b/,
+  /\bqual e o seu caso hoje\b/,
+  /\bqual é o seu caso hoje\b/,
+  /\bchatbot, ninguem ou voce\b/,
+  /\bchatbot, ninguém ou você\b/,
+  /\bvoce mesmo correndo atras\b/,
+  /\bvocê mesmo correndo atrás\b/,
+];
+
+function hasWeakCarouselCopy(value: string) {
+  const normalized = normalizeForDetection(value);
+
+  return WEAK_CAROUSEL_COPY.some((pattern) => pattern.test(normalized));
+}
 
 function isDuplicateCopy(headline: string, body: string) {
   const cleanHeadline = normalizeForDetection(headline);
@@ -401,9 +423,13 @@ function firstPublicQuestion(input: CarouselGenerationInput) {
   ];
 
   for (const candidate of candidates) {
-    const question = questionFromText(candidate);
+    const question = applyPortugueseQualityGate(questionFromText(candidate));
 
-    if (question && !hasBriefingLanguage(question)) {
+    if (
+      question &&
+      !hasBriefingLanguage(question) &&
+      !hasWeakCarouselCopy(question)
+    ) {
       return cleanLine(question, 90);
     }
   }
@@ -420,8 +446,12 @@ function publicProblem(input: CarouselGenerationInput) {
   ];
 
   for (const candidate of candidates) {
-    if (candidate && !hasBriefingLanguage(candidate)) {
-      return cleanLine(candidate, 170);
+    if (
+      candidate &&
+      !hasBriefingLanguage(candidate) &&
+      !hasWeakCarouselCopy(candidate)
+    ) {
+      return cleanLine(applyPortugueseQualityGate(candidate), 170);
     }
   }
 
@@ -437,8 +467,12 @@ function publicValue(input: CarouselGenerationInput, brandName: string) {
   ];
 
   for (const candidate of candidates) {
-    if (candidate && !hasBriefingLanguage(candidate)) {
-      return cleanLine(candidate, 170);
+    if (
+      candidate &&
+      !hasBriefingLanguage(candidate) &&
+      !hasWeakCarouselCopy(candidate)
+    ) {
+      return cleanLine(applyPortugueseQualityGate(candidate), 170);
     }
   }
 
@@ -453,7 +487,7 @@ function inferAudienceSubject(input: CarouselGenerationInput) {
   }
 
   if (audience.includes("empresa") || audience.includes("negocio")) {
-    return "O negocio";
+    return "O negócio";
   }
 
   if (audience.includes("time")) {
@@ -662,6 +696,59 @@ function questionFromText(value: string) {
   const question = value.match(/([^.!?\n]*\?)/);
 
   return question ? cleanLine(question[1], 160) : "";
+}
+
+function applyPortugueseQualityGate(value: string) {
+  return value
+    .replace(/\bNao\b/g, "Não")
+    .replace(/\bnao\b/g, "não")
+    .replace(/\bTambem\b/g, "Também")
+    .replace(/\btambem\b/g, "também")
+    .replace(/\bEsta\b/g, "Está")
+    .replace(/\besta\b/g, "está")
+    .replace(/\bVoce\b/g, "Você")
+    .replace(/\bvoce\b/g, "você")
+    .replace(/\bNegocio\b/g, "Negócio")
+    .replace(/\bnegocio\b/g, "negócio")
+    .replace(/\bRobo\b/g, "Robô")
+    .replace(/\brobo\b/g, "robô")
+    .replace(/\bAte\b/g, "Até")
+    .replace(/\bate\b/g, "até")
+    .replace(/\bNinguem\b/g, "Ninguém")
+    .replace(/\bninguem\b/g, "ninguém")
+    .replace(/\bAtras\b/g, "Atrás")
+    .replace(/\batras\b/g, "atrás")
+    .replace(/\bJa\b/g, "Já")
+    .replace(/\bja\b/g, "já")
+    .replace(/\bComecou\b/g, "Começou")
+    .replace(/\bcomecou\b/g, "começou")
+    .replace(/\bPratica\b/g, "Prática")
+    .replace(/\bpratica\b/g, "prática")
+    .replace(/\bConfianca\b/g, "Confiança")
+    .replace(/\bconfianca\b/g, "confiança")
+    .replace(/\bComecar\b/g, "Começar")
+    .replace(/\bcomecar\b/g, "começar")
+    .replace(/\bSolucao\b/g, "Solução")
+    .replace(/\bsolucao\b/g, "solução")
+    .replace(/\bPublica\b/g, "Pública")
+    .replace(/\bpublica\b/g, "pública")
+    .replace(/\bGenerico\b/g, "Genérico")
+    .replace(/\bgenerico\b/g, "genérico")
+    .replace(/\bConsequencia\b/g, "Consequência")
+    .replace(/\bconsequencia\b/g, "consequência")
+    .replace(/\bCriterio\b/g, "Critério")
+    .replace(/\bcriterio\b/g, "critério")
+    .replace(/\bAlguem\b/g, "Alguém")
+    .replace(/\balguem\b/g, "alguém")
+    .replace(/\bProxima\b/g, "Próxima")
+    .replace(/\bproxima\b/g, "próxima")
+    .replace(/\bQual e\b/g, "Qual é")
+    .replace(/\bqual e\b/g, "qual é")
+    .replace(/\bNao e\b/g, "Não é")
+    .replace(/\bnão e\b/g, "não é")
+    .replace(/^E atendimento\b/g, "É atendimento")
+    .replace(/^e atendimento\b/g, "é atendimento")
+    .trim();
 }
 
 function normalizeForDetection(value: string) {

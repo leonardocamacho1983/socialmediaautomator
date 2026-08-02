@@ -15,6 +15,8 @@ Included:
 - cover, scene, tension, mechanism, proof, and close slide roles;
 - public slide copy generated separately from internal concept notes;
 - internal purpose kept out of the rendered slide text;
+- Portuguese spelling and accent quality gate for common carousel output;
+- weak CTA guard against awkward questions such as `qual e o seu caso hoje`;
 - quality gate against briefing language such as `metafora`, `virada`,
   `fecho`, `mostrar que`, `estrutura narrativa`, and `direcao visual`;
 - brand colors and font choices from the local brand profile;
@@ -48,12 +50,12 @@ carouselPackage: CarouselPackage | null
 The current renderer is:
 
 ```text
-deterministic-carousel-v2
+deterministic-carousel-v3
 ```
 
-Older `deterministic-carousel-v1` packages are intentionally treated as stale.
-Generate the carousel again to replace briefing-like slide copy with public
-copy.
+Older `deterministic-carousel-v1` and `deterministic-carousel-v2` packages are
+intentionally treated as stale. Generate the carousel again to replace
+briefing-like, unaccented, or weak slide copy with public copy.
 
 The package is intentionally browser-local for now. This keeps the milestone
 focused on whether the approved post can become a useful sequence before adding
@@ -77,7 +79,10 @@ Manual validation:
 3. Confirm six slides appear.
 4. Confirm the slide text does not include internal words like `metafora`,
    `virada`, `fecho`, or `mostrar que`.
-5. Click `Baixar ZIP do carrossel`.
-6. Confirm the ZIP includes `slides/slide-01.png` through
+5. Confirm common Portuguese words are accented, for example `não`, `você`,
+   `está`, `também`, `negócio`, `robô`, `ninguém`, and `já`.
+6. Confirm the final slide uses a natural question, not a long awkward prompt.
+7. Click `Baixar ZIP do carrossel`.
+8. Confirm the ZIP includes `slides/slide-01.png` through
    `slides/slide-06.png`, copy files, `roteiro.txt`, and `metadata.json`.
-7. Click `Apagar carrossel` and confirm the empty state returns.
+9. Click `Apagar carrossel` and confirm the empty state returns.
