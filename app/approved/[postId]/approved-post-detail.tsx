@@ -12,6 +12,7 @@ import {
 import {
   APPROVED_POSTS_STORAGE_KEY,
   appendApprovedPostAssets,
+  applyApprovedPostSafeCopyFixes,
   approveApprovedPostCarousel,
   approveApprovedPostVisual,
   buildApprovedPostText,
@@ -52,6 +53,10 @@ import {
   type CarouselSlide,
   type CarouselSlideCopyEdit,
 } from "../../../lib/creative/carousel";
+import {
+  buildCopyQualityReport,
+  type CopyQualityReport,
+} from "../../../lib/creative/copy-quality";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import {
   downloadSvgAsPng,
@@ -129,6 +134,15 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     [postId, posts],
   );
   const view = post ? buildApprovedPostView(post) : null;
+  const copyQualityReport =
+    post && view
+      ? buildCopyQualityReport({
+          brandProfile: view.brand,
+          typographicCopy: view.typographicPiece.copy,
+          captionVariant: view.captionVariant,
+          carouselPackage: post.carouselPackage,
+        })
+      : null;
   const finalChecklist = post?.projectSnapshot.finalPostPackage?.checklist || [];
   const generatedAssets = post?.generatedAssets || [];
   const suggestedAssetPrompt =
@@ -432,10 +446,38 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       return;
     }
 
+    if (copyQualityReport?.blockerCount) {
+      setStatus(
+        "Quality Gate encontrou travas de copy. Corrija antes de finalizar.",
+      );
+      window.setTimeout(() => setStatus(""), 3600);
+      return;
+    }
+
     persistPosts(finalizeApprovedPostPackage(posts, post.id));
     setStatus("Pacote finalizado.");
     setAssetStatus("Pacote final pronto para baixar.");
     window.setTimeout(() => setStatus(""), 2600);
+  }
+
+  function fixCopyQuality() {
+    if (!post || !copyQualityReport) {
+      return;
+    }
+
+    if (!copyQualityReport.autoFixableCount) {
+      setStatus(
+        "Não há correção automática segura. Edite ou regenere os trechos marcados.",
+      );
+      window.setTimeout(() => setStatus(""), 3600);
+      return;
+    }
+
+    persistPosts(applyApprovedPostSafeCopyFixes(posts, post.id));
+    setStatus(
+      "Correções seguras aplicadas. Revise a copy antes de finalizar novamente.",
+    );
+    window.setTimeout(() => setStatus(""), 3600);
   }
 
   function deleteAsset(assetId: string) {
@@ -602,10 +644,10 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </Link>
           </div>
           <div>
-            <p className="eyebrow">Marco 5</p>
-            <h1>Post nao encontrado</h1>
+            <p className="eyebrow">Marco 6</p>
+            <h1>Post não encontrado</h1>
             <p className="lead">
-              Este post nao existe na biblioteca local deste navegador.
+              Este post não existe na biblioteca local deste navegador.
             </p>
           </div>
         </header>
@@ -614,7 +656,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           <strong>Biblioteca local sem este item.</strong>
           <p>
             A biblioteca ainda vive no navegador. Se o post foi aprovado em
-            outro dispositivo, ele nao aparece aqui.
+            outro dispositivo, ele não aparece aqui.
           </p>
           <Link className="primary-button" href="/approved">
             Voltar para aprovados
@@ -639,12 +681,13 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 5</p>
+          <p className="eyebrow">Marco 6</p>
           <h1>{post.title}</h1>
           <p className="lead">
-            Revisao individual do post aprovado, com escolha de asset,
-            composicao visual, aprovacao final e primeiro carrossel. Ainda sem
-            publicacao, Zernio, banco de dados ou automacao.
+            Revisão individual do post aprovado, com escolha de asset,
+            composição visual, Quality Gate de copy, aprovação final e primeiro
+            carrossel. Ainda sem publicação, Zernio, banco de dados ou
+            automação.
           </p>
         </div>
       </header>
@@ -857,6 +900,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
               <p
                 className={
                   assetStatus.includes("Nao") ||
+                  assetStatus.includes("Não") ||
                   assetStatus.includes("erro") ||
                   assetStatus.includes("recusou") ||
                   assetStatus.includes("limite") ||
@@ -870,7 +914,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
               </p>
             ) : null}
             <p className="approved-detail-muted">
-              O asset nao deve trazer texto. A headline, a marca e o CTA sao
+              O asset não deve trazer texto. A headline, a marca e o CTA são
               aplicados pelo renderizador do sistema.
             </p>
           </div>
@@ -1029,18 +1073,18 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         <div className="final-package-grid">
           <div>
             <strong>Imagem final</strong>
-            <span>{view?.selectedAsset ? "Com asset visual" : "Tipografico"}</span>
+            <span>{view?.selectedAsset ? "Com asset visual" : "Tipográfico"}</span>
           </div>
           <div>
             <strong>Legenda</strong>
-            <span>{view?.caption ? "Incluida" : "Indisponivel"}</span>
+            <span>{view?.caption ? "Incluída" : "Indisponível"}</span>
           </div>
           <div>
-            <strong>Comentario</strong>
-            <span>{view?.firstComment ? "Incluido" : "Vazio"}</span>
+            <strong>Comentário</strong>
+            <span>{view?.firstComment ? "Incluído" : "Vazio"}</span>
           </div>
           <div>
-            <strong>Historico</strong>
+            <strong>Histórico</strong>
             <span>
               {post.visualEvents.length === 1
                 ? "1 evento"
@@ -1072,10 +1116,17 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
 
         <p className="approved-detail-muted">
           Finalizar aprova o visual atual e libera o ZIP com PNG final
-          1080x1350, legenda, primeiro comentario, hashtags, prompt do asset,
-          metadados e historico visual.
+          1080x1350, legenda, primeiro comentário, hashtags, prompt do asset,
+          metadados e histórico visual.
         </p>
       </section>
+
+      {copyQualityReport ? (
+        <CopyQualityPanel
+          report={copyQualityReport}
+          onFixCopy={fixCopyQuality}
+        />
+      ) : null}
 
       <section className="approved-detail-card carousel-card">
         <div className="asset-section-heading">
@@ -1313,6 +1364,92 @@ type CarouselSlideEditorProps = {
   slide: CarouselSlide;
 };
 
+function CopyQualityPanel({
+  report,
+  onFixCopy,
+}: {
+  report: CopyQualityReport;
+  onFixCopy: () => void;
+}) {
+  const hasIssues = report.status === "review";
+
+  return (
+    <section className="approved-detail-card copy-quality-card">
+      <div className="asset-section-heading">
+        <div>
+          <p className="section-kicker">Marco 6</p>
+          <h2>Quality Gate de Copy</h2>
+        </div>
+        <span
+          className={
+            hasIssues
+              ? "copy-quality-status copy-quality-status-review"
+              : "copy-quality-status copy-quality-status-ok"
+          }
+        >
+          {hasIssues ? "Revisar" : "OK"}
+        </span>
+      </div>
+
+      <div className="copy-quality-summary">
+        <strong>{report.summary}</strong>
+        <span>
+          {report.blockerCount
+            ? "Travas bloqueiam a finalização do pacote."
+            : "Sem trava editorial bloqueando o pacote final."}
+        </span>
+      </div>
+
+      <div className="copy-quality-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onFixCopy}
+          disabled={!report.autoFixableCount}
+        >
+          Corrigir copy
+        </button>
+        <span>
+          {report.autoFixableCount
+            ? "Aplica apenas acentos, espaços, pontuação e travessões."
+            : "Os pontos restantes exigem edição manual ou regeneração."}
+        </span>
+      </div>
+
+      <div className="copy-quality-grid">
+        {report.checks.map((check) => (
+          <article
+            className={
+              check.status === "ok"
+                ? "copy-quality-check copy-quality-check-ok"
+                : "copy-quality-check copy-quality-check-review"
+            }
+            key={check.id}
+          >
+            <div>
+              <span>{check.status === "ok" ? "OK" : "Revisar"}</span>
+              <strong>{check.label}</strong>
+            </div>
+            <p>{check.note}</p>
+            {check.issues.length ? (
+              <div className="copy-quality-issues">
+                {check.issues.slice(0, 4).map((issue) => (
+                  <div className="copy-quality-issue" key={issue.id}>
+                    <strong>
+                      {issue.fieldLabel}: {issue.label}
+                    </strong>
+                    <p>{issue.suggestion}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CarouselSlideEditor({
   brand,
   carouselPackage,
@@ -1382,7 +1519,7 @@ function CarouselSlideEditor({
         />
       </label>
       <label className="field carousel-slide-field">
-        <span>Rodape</span>
+        <span>Rodapé</span>
         <input
           value={footer}
           onChange={(event) => setFooter(event.target.value)}
@@ -1428,7 +1565,7 @@ const carouselIssueFieldLabels: Record<keyof CarouselSlideCopyEdit, string> = {
   eyebrow: "Marcador",
   headline: "Headline",
   body: "Apoio",
-  footer: "Rodape",
+  footer: "Rodapé",
 };
 
 function readApprovedPosts() {
@@ -1546,7 +1683,7 @@ function buildCarouselScript(post: ApprovedPost) {
       `Slide ${slide.index} - ${slide.eyebrow}`,
       slide.headline,
       slide.body,
-      slide.footer ? `Rodape: ${slide.footer}` : "",
+      slide.footer ? `Rodapé: ${slide.footer}` : "",
       "",
     ]),
   ]

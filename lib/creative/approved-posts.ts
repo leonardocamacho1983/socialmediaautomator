@@ -14,6 +14,7 @@ import {
   type CarouselPackage,
   type CarouselSlideCopyEdit,
 } from "./carousel";
+import { polishCopyText } from "./copy-quality";
 import type { CreativeConcept, CreativeProject } from "./concepts";
 import {
   getSelectedTypographicVariant,
@@ -853,6 +854,103 @@ export function deleteApprovedPostCarousel(
   );
 }
 
+export function applyApprovedPostSafeCopyFixes(
+  posts: ApprovedPost[],
+  postId: string,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId) {
+      return post;
+    }
+
+    let changed = false;
+    const typographicPiece = post.projectSnapshot.typographicPiece
+      ? {
+          ...post.projectSnapshot.typographicPiece,
+          copy: {
+            headline: polishField(
+              post.projectSnapshot.typographicPiece.copy.headline,
+              () => {
+                changed = true;
+              },
+            ),
+            support: polishField(
+              post.projectSnapshot.typographicPiece.copy.support,
+              () => {
+                changed = true;
+              },
+            ),
+            cta: polishField(
+              post.projectSnapshot.typographicPiece.copy.cta,
+              () => {
+                changed = true;
+              },
+            ),
+          },
+        }
+      : post.projectSnapshot.typographicPiece;
+    const captionPackage = post.projectSnapshot.captionPackage
+      ? {
+          ...post.projectSnapshot.captionPackage,
+          variants: post.projectSnapshot.captionPackage.variants.map((variant) =>
+            variant.id === post.projectSnapshot.captionPackage?.selectedVariantId
+              ? {
+                  ...variant,
+                  caption: polishField(variant.caption, () => {
+                    changed = true;
+                  }),
+                  firstComment: polishField(variant.firstComment, () => {
+                    changed = true;
+                  }),
+                }
+              : variant,
+          ),
+        }
+      : post.projectSnapshot.captionPackage;
+    const carouselPackage = post.carouselPackage
+      ? {
+          ...post.carouselPackage,
+          slides: post.carouselPackage.slides.map((slide) => ({
+            ...slide,
+            eyebrow: polishField(slide.eyebrow, () => {
+              changed = true;
+            }),
+            headline: polishField(slide.headline, () => {
+              changed = true;
+            }),
+            body: polishField(slide.body, () => {
+              changed = true;
+            }),
+            footer: polishField(slide.footer, () => {
+              changed = true;
+            }),
+          })),
+        }
+      : post.carouselPackage;
+
+    if (!changed) {
+      return post;
+    }
+
+    return {
+      ...post,
+      finalPackageStatus: "open",
+      finalPackageReadyAt: null,
+      status: "approved",
+      carouselPackage,
+      carouselStatus: post.carouselPackage ? "draft" : post.carouselStatus,
+      carouselApprovedAt: post.carouselPackage ? null : post.carouselApprovedAt,
+      projectSnapshot: {
+        ...post.projectSnapshot,
+        typographicPiece,
+        captionPackage,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
 export function getVisualAssetRejectionReason(
   reasonId: VisualAssetRejectionReasonId,
 ) {
@@ -860,6 +958,16 @@ export function getVisualAssetRejectionReason(
     visualAssetRejectionReasons.find((reason) => reason.id === reasonId) ||
     visualAssetRejectionReasons[0]
   );
+}
+
+function polishField(value: string, onChange: () => void) {
+  const polished = polishCopyText(value);
+
+  if (polished !== value) {
+    onChange();
+  }
+
+  return polished;
 }
 
 function nextVisualStatusForAssetSelection(

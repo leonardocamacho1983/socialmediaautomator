@@ -2,6 +2,14 @@ import type { BrandProfile } from "../brand/profile";
 import type { CaptionVariant } from "./captions";
 import type { CreativeBriefing, CreativeConcept } from "./concepts";
 import {
+  applyPortugueseQualityGate,
+  cleanCopyLine as cleanLine,
+  hasBriefingLanguage,
+  hasWeakPublicCopy,
+  normalizeForDetection,
+  reviewCopyText,
+} from "./copy-quality";
+import {
   svgToDataUrl,
   TYPOGRAPHIC_POST_HEIGHT,
   TYPOGRAPHIC_POST_WIDTH,
@@ -154,33 +162,36 @@ export function evaluateCarouselSlideCopy(
     body: slide.body,
     footer: slide.footer,
   } satisfies Record<keyof CarouselSlideCopyEdit, string>;
+  const maxLengthByField = {
+    eyebrow: 34,
+    headline: 94,
+    body: 180,
+    footer: 56,
+  } satisfies Record<keyof CarouselSlideCopyEdit, number>;
+  const fieldLabels = {
+    eyebrow: "Marcador",
+    headline: "Headline",
+    body: "Apoio",
+    footer: "Rodapé",
+  } satisfies Record<keyof CarouselSlideCopyEdit, string>;
 
   return Object.entries(fields).flatMap(([field, value]) => {
-    const issues: CarouselSlideCopyIssue[] = [];
     const typedField = field as keyof CarouselSlideCopyEdit;
 
-    if (hasBriefingLanguage(value)) {
-      issues.push({
+    return reviewCopyText({
+      value,
+      field,
+      fieldLabel: fieldLabels[typedField],
+      required: typedField !== "body" && typedField !== "footer",
+      maxLength: maxLengthByField[typedField],
+      role: "carousel",
+      compareAgainst: typedField === "body" ? [slide.headline] : undefined,
+    })
+      .filter((issue) => issue.severity === "blocker")
+      .map((issue) => ({
         field: typedField,
-        label: "Parece linguagem de briefing, nao texto publico.",
-      });
-    }
-
-    if (hasWeakCarouselCopy(value)) {
-      issues.push({
-        field: typedField,
-        label: "Copy fraca ou mecanica. Reescreva antes de aprovar.",
-      });
-    }
-
-    if (applyPortugueseQualityGate(value) !== value) {
-      issues.push({
-        field: typedField,
-        label: "Revise acentos e portugues antes de aprovar.",
-      });
-    }
-
-    return issues;
+        label: issue.label,
+      }));
   });
 }
 
@@ -513,7 +524,7 @@ function buildGenericCarousel(
           "Esse é o ponto que precisa aparecer antes da próxima campanha.",
           "Comece por aí antes de pedir mais atenção para a marca.",
           "A melhora mais importante talvez esteja antes da oferta.",
-          "O próximo post deve nascer desse ponto, não de uma frase solta.",
+          "O próximo passo deve nascer desse ponto, não de uma frase solta.",
         ],
         variation,
       ),
@@ -606,7 +617,7 @@ function publicFallbackForRole(
   return {
     eyebrow: brandName,
     headline: firstPublicQuestion(input) || "Onde a conversa trava hoje?",
-    body: "Esse e o ponto que precisa aparecer antes da proxima campanha.",
+    body: "Esse é o ponto que precisa aparecer antes da próxima campanha.",
     footer: cta || "Comente ou salve para revisar depois.",
   };
 }
@@ -636,47 +647,8 @@ function polishCarouselCopyField(
   );
 }
 
-function hasBriefingLanguage(value: string) {
-  const normalized = normalizeForDetection(value);
-
-  return BRIEFING_LANGUAGE.some((pattern) => pattern.test(normalized));
-}
-
-const BRIEFING_LANGUAGE = [
-  /\bmetafora\b/,
-  /\bvirada\b/,
-  /\bfecho\b/,
-  /\bmostrar\b/,
-  /\bmostrando\b/,
-  /\bideia de que\b/,
-  /\bestrutura\b/,
-  /\bnarrativa\b/,
-  /\bdirecao\b/,
-  /\bdirecao visual\b/,
-  /\bprova\b/,
-  /\bmecanismo\b/,
-  /\bconceito\b/,
-  /\bcopy\b/,
-  /\bpost\b/,
-  /\bslide\b/,
-];
-
-const WEAK_CAROUSEL_COPY = [
-  /\bo cliente mandou mensagem\b/,
-  /\bdemora tambem comunica\b/,
-  /\bdemora também comunica\b/,
-  /\bqual e o seu caso hoje\b/,
-  /\bqual é o seu caso hoje\b/,
-  /\bchatbot, ninguem ou voce\b/,
-  /\bchatbot, ninguém ou você\b/,
-  /\bvoce mesmo correndo atras\b/,
-  /\bvocê mesmo correndo atrás\b/,
-];
-
 function hasWeakCarouselCopy(value: string) {
-  const normalized = normalizeForDetection(value);
-
-  return WEAK_CAROUSEL_COPY.some((pattern) => pattern.test(normalized));
+  return hasWeakPublicCopy(value);
 }
 
 function isDuplicateCopy(headline: string, body: string) {
@@ -1134,78 +1106,6 @@ function questionFromText(value: string) {
 
 function stripOuterQuotes(value: string) {
   return value.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-}
-
-function applyPortugueseQualityGate(value: string) {
-  return value
-    .replace(/\bNao\b/g, "Não")
-    .replace(/\bnao\b/g, "não")
-    .replace(/\bTambem\b/g, "Também")
-    .replace(/\btambem\b/g, "também")
-    .replace(/\bEsta\b/g, "Está")
-    .replace(/\besta\b/g, "está")
-    .replace(/\bVoce\b/g, "Você")
-    .replace(/\bvoce\b/g, "você")
-    .replace(/\bNegocio\b/g, "Negócio")
-    .replace(/\bnegocio\b/g, "negócio")
-    .replace(/\bRobo\b/g, "Robô")
-    .replace(/\brobo\b/g, "robô")
-    .replace(/\bAte\b/g, "Até")
-    .replace(/\bate\b/g, "até")
-    .replace(/\bNinguem\b/g, "Ninguém")
-    .replace(/\bninguem\b/g, "ninguém")
-    .replace(/\bAtras\b/g, "Atrás")
-    .replace(/\batras\b/g, "atrás")
-    .replace(/\bJa\b/g, "Já")
-    .replace(/\bja\b/g, "já")
-    .replace(/\bComecou\b/g, "Começou")
-    .replace(/\bcomecou\b/g, "começou")
-    .replace(/\bPratica\b/g, "Prática")
-    .replace(/\bpratica\b/g, "prática")
-    .replace(/\bConfianca\b/g, "Confiança")
-    .replace(/\bconfianca\b/g, "confiança")
-    .replace(/\bComecar\b/g, "Começar")
-    .replace(/\bcomecar\b/g, "começar")
-    .replace(/\bSolucao\b/g, "Solução")
-    .replace(/\bsolucao\b/g, "solução")
-    .replace(/\bPublica\b/g, "Pública")
-    .replace(/\bpublica\b/g, "pública")
-    .replace(/\bGenerico\b/g, "Genérico")
-    .replace(/\bgenerico\b/g, "genérico")
-    .replace(/\bConsequencia\b/g, "Consequência")
-    .replace(/\bconsequencia\b/g, "consequência")
-    .replace(/\bCriterio\b/g, "Critério")
-    .replace(/\bcriterio\b/g, "critério")
-    .replace(/\bAlguem\b/g, "Alguém")
-    .replace(/\balguem\b/g, "alguém")
-    .replace(/\bProxima\b/g, "Próxima")
-    .replace(/\bproxima\b/g, "próxima")
-    .replace(/\bQual e\b/g, "Qual é")
-    .replace(/\bqual e\b/g, "qual é")
-    .replace(/\bNao e\b/g, "Não é")
-    .replace(/\bnão e\b/g, "não é")
-    .replace(/^E atendimento\b/g, "É atendimento")
-    .replace(/^e atendimento\b/g, "é atendimento")
-    .trim();
-}
-
-function normalizeForDetection(value: string) {
-  return value
-    .toLocaleLowerCase("pt-BR")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function cleanLine(value: string, maxLength: number) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
 
 type Palette = {

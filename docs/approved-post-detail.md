@@ -1,11 +1,12 @@
-# Marco 5 Approved Post Detail
+# Marco 6 Approved Post Detail
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 5 keeps the individual review page for each locally approved post and
-adds a deterministic carousel package generated from the approved concept.
+Marco 6 keeps the individual review page for each locally approved post, keeps
+the deterministic carousel package from Marco 5, and adds a copy quality gate
+before package finalization.
 
 Included:
 
@@ -33,6 +34,10 @@ Included:
 - preview each carousel slide in the detail page;
 - download a ZIP with carousel PNGs, script, copy, and metadata;
 - delete and regenerate the carousel package.
+- review visual copy, caption, first comment, hashtags, and carousel slide copy;
+- block final package approval while copy blockers remain;
+- apply safe deterministic copy fixes for accents, spacing, repeated
+  punctuation, and dashes.
 
 Not included:
 
@@ -59,9 +64,11 @@ Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Marco 4.1 adds
 `selectedAssetCompositionId`, `visualStatus`, `visualApprovedAt`, and
 `visualAssetRejections`. Marco 4.2 adds `visualEvents`,
 `finalPackageStatus`, and `finalPackageReadyAt`. Marco 5 adds
-`carouselPackage`. Older records without asset fields are normalized to an empty
-asset list, no selected asset, the default composition, typographic-only visual
-status, empty visual history, package status open, and no carousel package.
+`carouselPackage`. Marco 6 does not add a new storage field; it derives the
+quality report from the current stored copy. Older records without asset fields
+are normalized to an empty asset list, no selected asset, the default
+composition, typographic-only visual status, empty visual history, package
+status open, and no carousel package.
 
 This is still browser-local state. It is not a durable production content
 database.
@@ -97,3 +104,8 @@ Manual validation:
 12. Generate the carousel and confirm six slide previews appear.
 13. Download the carousel ZIP and confirm it includes six PNG slides, copy,
     script, and metadata.
+14. Confirm the `Quality Gate de Copy` panel appears after the final package
+    section.
+15. Add a copy issue such as `Nao e robo — transforme sua jornada`.
+16. Confirm package finalization is blocked while blocker issues remain.
+17. Click `Corrigir copy` and confirm only safe fixes are applied.
