@@ -16,7 +16,7 @@ export function GET() {
   return Response.json({
     status: "ok",
     service: "socialmediaautomator",
-    milestone: "marco-3-1-caption-generation",
+    milestone: "marco-5-deterministic-carousel",
     productFeaturesEnabled: true,
     aiGatewayConfigured: staticGatewayKeyPresent || vercelRuntimePresent,
     aiGatewayAuth: {
