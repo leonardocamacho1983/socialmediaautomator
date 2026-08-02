@@ -1350,7 +1350,13 @@ function CarouselSlideEditor({
       />
       <div className="carousel-slide-card-header">
         <strong>Slide {slide.index}</strong>
-        <span>{carouselSlideRoleLabels[slide.role]}</span>
+        <span>
+          {carouselSlideRoleLabels[slide.role]} | Variacao{" "}
+          {Math.max(
+            0,
+            Math.floor(slide.variation ?? carouselPackage.variation ?? 0),
+          ) + 1}
+        </span>
       </div>
       <label className="field carousel-slide-field">
         <span>Marcador</span>

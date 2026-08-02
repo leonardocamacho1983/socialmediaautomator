@@ -134,6 +134,7 @@ export type ApprovedPost = {
   carouselApprovedAt: string | null;
   carouselPackage: CarouselPackage | null;
   carouselEvents: ApprovedPostCarouselEvent[];
+  carouselGenerationIndex: number;
   notes: string;
   generatedAssets: GeneratedVisualAsset[];
   selectedVisualAssetId: string | null;
@@ -161,6 +162,7 @@ type StoredApprovedPost = Omit<
   | "carouselApprovedAt"
   | "carouselPackage"
   | "carouselEvents"
+  | "carouselGenerationIndex"
 > & {
   notes?: string;
   generatedAssets?: GeneratedVisualAsset[];
@@ -176,6 +178,7 @@ type StoredApprovedPost = Omit<
   carouselApprovedAt?: string | null;
   carouselPackage?: CarouselPackage | null;
   carouselEvents?: ApprovedPostCarouselEvent[];
+  carouselGenerationIndex?: number | null;
 };
 
 export function createApprovedPostFromProject(
@@ -203,6 +206,7 @@ export function createApprovedPostFromProject(
     carouselApprovedAt: null,
     carouselPackage: null,
     carouselEvents: [],
+    carouselGenerationIndex: 0,
     notes: "",
     generatedAssets: [],
     selectedVisualAssetId: null,
@@ -235,9 +239,7 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
         post.visualAssetRejections,
       );
       const visualEvents = normalizeVisualEvents(post.visualEvents);
-      const carouselPackage = isCarouselPackage(post.carouselPackage)
-        ? post.carouselPackage
-        : null;
+      const carouselPackage = normalizeCarouselPackage(post.carouselPackage);
 
       return {
         ...post,
@@ -272,6 +274,10 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
             : null,
         carouselPackage,
         carouselEvents: normalizeCarouselEvents(post.carouselEvents),
+        carouselGenerationIndex: normalizeCarouselGenerationIndex(
+          post.carouselGenerationIndex,
+          carouselPackage,
+        ),
       };
     });
 }
@@ -302,6 +308,7 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
           carouselApprovedAt: item.carouselApprovedAt || null,
           carouselPackage: item.carouselPackage || null,
           carouselEvents: item.carouselEvents || [],
+          carouselGenerationIndex: item.carouselGenerationIndex || 0,
         }
       : item,
   );
@@ -655,25 +662,31 @@ export function generateApprovedPostCarousel(
       return post;
     }
 
+    const variation = nextCarouselVariation(post);
+
     return {
       ...post,
-      carouselPackage: createCarouselPackage({
-        postId: post.id,
-        brandProfile: post.projectSnapshot.brandSnapshot,
-        briefing: post.projectSnapshot.briefing,
-        concept,
-        typographicPiece,
-        captionVariant,
-      }),
+      carouselPackage: createCarouselPackage(
+        {
+          postId: post.id,
+          brandProfile: post.projectSnapshot.brandSnapshot,
+          briefing: post.projectSnapshot.briefing,
+          concept,
+          typographicPiece,
+          captionVariant,
+        },
+        { variation },
+      ),
       carouselStatus: "draft",
       carouselApprovedAt: null,
+      carouselGenerationIndex: variation + 1,
       carouselEvents: appendCarouselEvent(post, {
         type: "carousel_generated",
         label: post.carouselPackage
           ? "Carrossel regenerado"
           : "Carrossel gerado",
         detail:
-          "O roteiro visual do carrossel foi criado a partir do conceito aprovado.",
+          `O roteiro visual do carrossel foi criado a partir do conceito aprovado. Variacao ${variation + 1}.`,
       }),
       updatedAt: new Date().toISOString(),
     };
@@ -744,14 +757,21 @@ export function regenerateApprovedPostCarouselSlide(
       return post;
     }
 
-    const freshPackage = createCarouselPackage({
-      postId: post.id,
-      brandProfile: post.projectSnapshot.brandSnapshot,
-      briefing: post.projectSnapshot.briefing,
-      concept,
-      typographicPiece,
-      captionVariant,
-    });
+    const variation = Math.max(
+      nextCarouselVariation(post),
+      normalizeCarouselVariation(currentSlide.variation) + 1,
+    );
+    const freshPackage = createCarouselPackage(
+      {
+        postId: post.id,
+        brandProfile: post.projectSnapshot.brandSnapshot,
+        briefing: post.projectSnapshot.briefing,
+        concept,
+        typographicPiece,
+        captionVariant,
+      },
+      { variation },
+    );
     const freshSlide =
       freshPackage.slides.find((slide) => slide.role === currentSlide.role) ||
       freshPackage.slides[currentSlide.index - 1];
@@ -776,11 +796,12 @@ export function regenerateApprovedPostCarouselSlide(
       },
       carouselStatus: "draft",
       carouselApprovedAt: null,
+      carouselGenerationIndex: variation + 1,
       carouselEvents: appendCarouselEvent(post, {
         type: "carousel_slide_regenerated",
         label: `Slide ${currentSlide.index} regenerado`,
         detail:
-          "Somente este slide voltou para a versao deterministica mais recente.",
+          `Somente este slide foi recriado com uma nova variacao. Variacao ${variation + 1}.`,
         slideId,
       }),
       updatedAt: new Date().toISOString(),
@@ -1089,6 +1110,38 @@ function normalizeCarouselEvents(value: unknown) {
   return value.filter(isApprovedPostCarouselEvent).slice(0, 48);
 }
 
+function normalizeCarouselPackage(value: unknown): CarouselPackage | null {
+  if (!isCarouselPackage(value)) {
+    return null;
+  }
+
+  const variation = normalizeCarouselVariation(value.variation);
+
+  return {
+    ...value,
+    variation,
+    slides: value.slides.map((slide) => ({
+      ...slide,
+      variation: normalizeCarouselVariation(slide.variation ?? variation),
+    })),
+  };
+}
+
+function normalizeCarouselGenerationIndex(
+  value: unknown,
+  carouselPackage: CarouselPackage | null,
+) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.floor(value);
+  }
+
+  if (carouselPackage) {
+    return normalizeCarouselVariation(carouselPackage.variation) + 1;
+  }
+
+  return 0;
+}
+
 function isCarouselPackage(value: unknown): value is CarouselPackage {
   if (!value || typeof value !== "object") {
     return false;
@@ -1105,6 +1158,16 @@ function isCarouselPackage(value: unknown): value is CarouselPackage {
     candidate.renderer === CURRENT_CAROUSEL_RENDERER &&
     Array.isArray(candidate.slides)
   );
+}
+
+function nextCarouselVariation(post: ApprovedPost) {
+  return normalizeCarouselVariation(post.carouselGenerationIndex);
+}
+
+function normalizeCarouselVariation(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : 0;
 }
 
 function resolveVisualStatus(context: {

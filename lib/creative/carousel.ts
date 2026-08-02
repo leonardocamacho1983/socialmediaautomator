@@ -20,6 +20,7 @@ export type CarouselSlide = {
   id: string;
   index: number;
   role: CarouselSlideRole;
+  variation: number;
   internalPurpose: string;
   eyebrow: string;
   headline: string;
@@ -34,6 +35,7 @@ export type CarouselPackage = {
   generatedAt: string;
   format: "4:5";
   renderer: "deterministic-carousel-v3";
+  variation: number;
   slides: CarouselSlide[];
 };
 
@@ -66,10 +68,16 @@ export type CarouselGenerationInput = {
   captionVariant: CaptionVariant | null;
 };
 
+export type CarouselGenerationOptions = {
+  variation?: number;
+};
+
 export function createCarouselPackage(
   input: CarouselGenerationInput,
+  options: CarouselGenerationOptions = {},
 ): CarouselPackage {
   const now = Date.now();
+  const variation = Math.max(0, Math.floor(options.variation || 0));
 
   return {
     id: `carousel-${now}`,
@@ -78,7 +86,8 @@ export function createCarouselPackage(
     generatedAt: new Date().toISOString(),
     format: "4:5",
     renderer: CURRENT_CAROUSEL_RENDERER,
-    slides: buildSlides(input, now),
+    variation,
+    slides: buildSlides(input, now, variation),
   };
 }
 
@@ -173,24 +182,26 @@ export function evaluateCarouselSlideCopy(
   });
 }
 
-function buildSlides(input: CarouselGenerationInput, seed: number) {
-  return buildPublicCarouselCopy(input).map((slide, index) => ({
+function buildSlides(input: CarouselGenerationInput, seed: number, variation: number) {
+  return buildPublicCarouselCopy(input, variation).map((slide, index) => ({
     id: `carousel-slide-${seed}-${index + 1}`,
     index: index + 1,
+    variation,
     ...slide,
   }));
 }
 
-type CarouselSlideDraft = Omit<CarouselSlide, "id" | "index">;
+type CarouselSlideDraft = Omit<CarouselSlide, "id" | "index" | "variation">;
 
 function buildPublicCarouselCopy(
   input: CarouselGenerationInput,
+  variation: number,
 ): CarouselSlideDraft[] {
   const brandName = input.brandProfile.brandName || "Social Studio";
 
   const drafts = isWhatsappSalesContext(input)
-    ? buildWhatsappSalesCarousel(input, brandName)
-    : buildGenericCarousel(input, brandName);
+    ? buildWhatsappSalesCarousel(input, brandName, variation)
+    : buildGenericCarousel(input, brandName, variation);
 
   return drafts.map((slide) => sanitizeSlideDraft(slide, input, brandName));
 }
@@ -198,54 +209,151 @@ function buildPublicCarouselCopy(
 function buildWhatsappSalesCarousel(
   input: CarouselGenerationInput,
   brandName: string,
+  variation: number,
 ): CarouselSlideDraft[] {
   return [
     {
       role: "cover",
       internalPurpose: "Abrir com o hook aprovado sem explicar a estratégia.",
       eyebrow: brandName,
-      headline: cleanLine(input.typographicPiece.copy.headline, 92),
-      body: cleanLine(input.typographicPiece.copy.support, 132),
+      headline: pickVariant(
+        [
+          cleanLine(input.typographicPiece.copy.headline, 92),
+          "A fila do WhatsApp não espera.",
+          "Mensagem parada também derruba venda.",
+          "Cliente esperando vira venda em risco.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          cleanLine(input.typographicPiece.copy.support, 132),
+          "A conversa chega. O tempo passa. A intenção esfria.",
+          "Se ninguém assume a conversa, alguém assume o cliente.",
+          "O problema não é só responder tarde. É parecer ausente.",
+        ],
+        variation,
+      ),
       footer: "Arraste",
     },
     {
       role: "scene",
       internalPurpose: "Colocar uma cena concreta de WhatsApp parado.",
       eyebrow: "O que acontece",
-      headline: "O cliente chamou. Ninguém respondeu.",
-      body: "Ele não está navegando. Está decidindo se espera você ou chama outro.",
+      headline: pickVariant(
+        [
+          "O cliente chamou. Ninguém respondeu.",
+          "A mensagem chegou. A resposta ficou para depois.",
+          "Seu WhatsApp virou sala de espera.",
+          "O cliente não sabe que você está ocupado.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Ele não está navegando. Está decidindo se espera você ou chama outro.",
+          "Nesse intervalo, ele compara, pergunta para outro e segue sem você.",
+          "Quanto mais a fila cresce, mais a venda perde temperatura.",
+          "Para ele, silêncio parece falta de prioridade.",
+        ],
+        variation,
+      ),
       footer: brandName,
     },
     {
       role: "tension",
       internalPurpose: "Mostrar a consequência comercial da demora.",
       eyebrow: "O custo",
-      headline: "Para você, foram só alguns minutos.",
-      body: "Para ele, foi tempo suficiente para procurar outra empresa.",
+      headline: pickVariant(
+        [
+          "Para você, foram só alguns minutos.",
+          "A demora não parece interna. Parece descaso.",
+          "O cliente não vê sua operação. Vê sua ausência.",
+          "Resposta lenta muda a temperatura da compra.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Para ele, foi tempo suficiente para procurar outra empresa.",
+          "Ele não sabe quem está ocupado. Só sabe quem respondeu primeiro.",
+          "Cada minuto sem resposta aumenta a chance de perder contexto.",
+          "A intenção ainda existe, mas começa a procurar outro caminho.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "mechanism",
       internalPurpose: "Introduzir a marca como mecanismo prático.",
       eyebrow: brandName,
-      headline: `${brandName} responde antes da conversa esfriar.`,
-      body: "Responde no tom do seu negócio e chama uma pessoa quando precisa.",
+      headline: pickVariant(
+        [
+          `${brandName} responde antes da conversa esfriar.`,
+          `${brandName} segura a conversa até seu time chegar.`,
+          `${brandName} entra enquanto o cliente ainda quer comprar.`,
+          `${brandName} organiza a fila antes dela virar perda.`,
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Responde no tom do seu negócio e chama uma pessoa quando precisa.",
+          "Mantém o atendimento vivo e passa para humano quando o assunto pede.",
+          "A resposta chega com contexto, sem parecer robô empurrando formulário.",
+          "A conversa continua sem depender de alguém olhando a tela o tempo todo.",
+        ],
+        variation,
+      ),
       footer: brandName,
     },
     {
       role: "proof",
       internalPurpose: "Diferenciar de chatbot genérico.",
       eyebrow: "Na prática",
-      headline: "Não é robô empurrando formulário.",
-      body: "É atendimento treinado para manter a conversa viva até o humano assumir.",
+      headline: pickVariant(
+        [
+          "Não é robô empurrando formulário.",
+          "Não é resposta genérica para todo mundo.",
+          "Não é sumir e voltar horas depois.",
+          "Não é trocar humano por script ruim.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "É atendimento treinado para manter a conversa viva até o humano assumir.",
+          "É a marca respondendo com critério antes da venda perder força.",
+          "É presença no WhatsApp sem apagar o jeito do seu negócio falar.",
+          "É processo para a conversa não depender de improviso.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "close",
       internalPurpose: "Fechar com pergunta que puxa comentário ou reflexão.",
       eyebrow: brandName,
-      headline: "Hoje, quem segura seu WhatsApp quando você não está online?",
-      body: "Olhe agora. Se a resposta demorou, a venda já começou a esfriar.",
+      headline: pickVariant(
+        [
+          "Hoje, quem segura seu WhatsApp quando você não está online?",
+          "Agora, quem responde antes da venda esfriar?",
+          "Quantas conversas estão esperando alguém assumir?",
+          "Seu cliente está esperando ou já foi atendido por outro?",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Olhe agora. Se a resposta demorou, a venda já começou a esfriar.",
+          "Abra a fila. Se tem cliente parado, tem venda perdendo força.",
+          "O problema aparece antes do relatório: na conversa sem dono.",
+          "Se a pergunta chegou e ninguém respondeu, a decisão já começou.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta || "Comente ou salve para revisar depois.",
     },
   ];
@@ -254,6 +362,7 @@ function buildWhatsappSalesCarousel(
 function buildGenericCarousel(
   input: CarouselGenerationInput,
   brandName: string,
+  variation: number,
 ): CarouselSlideDraft[] {
   const customer = inferAudienceSubject(input);
   const problem = publicProblem(input);
@@ -264,51 +373,154 @@ function buildGenericCarousel(
       role: "cover",
       internalPurpose: "Abrir com o hook aprovado.",
       eyebrow: brandName,
-      headline: cleanLine(input.typographicPiece.copy.headline, 92),
-      body: cleanLine(input.typographicPiece.copy.support, 132),
+      headline: pickVariant(
+        [
+          cleanLine(input.typographicPiece.copy.headline, 92),
+          stripOuterQuotes(input.concept.title || input.concept.hook),
+          publicProblem(input),
+          publicValue(input, brandName),
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          cleanLine(input.typographicPiece.copy.support, 132),
+          cleanLine(input.briefing.mainMessage, 132),
+          "O ponto não é explicar mais. É fazer a pessoa sentir o problema.",
+          "A sequência começa pelo incômodo antes de apresentar a solução.",
+        ],
+        variation,
+      ),
       footer: "Arraste",
     },
     {
       role: "scene",
       internalPurpose: "Transformar a dor em cena pública.",
       eyebrow: "O que acontece",
-      headline: `${customer} percebe antes de falar com você.`,
-      body: cleanLine(problem, 170),
+      headline: pickVariant(
+        [
+          `${customer} percebe antes de falar com você.`,
+          "O problema aparece antes da explicação.",
+          "A primeira impressão acontece no detalhe.",
+          "A pessoa sente antes de entender.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          cleanLine(problem, 170),
+          "Quando a experiência falha no começo, a oferta precisa remar contra.",
+          "Antes da decisão racional, já existe uma leitura emocional.",
+          "O incômodo parece pequeno por dentro e grande para quem está fora.",
+        ],
+        variation,
+      ),
       footer: brandName,
     },
     {
       role: "tension",
       internalPurpose: "Mostrar o custo da dor.",
       eyebrow: "O custo",
-      headline: "O intervalo cobra caro.",
-      body: "Quando a resposta demora, a confiança cai antes da conversa começar.",
+      headline: pickVariant(
+        [
+          "O intervalo cobra caro.",
+          "O detalhe pequeno vira sinal grande.",
+          "O custo aparece antes da venda.",
+          "A demora muda o que a pessoa sente.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Quando a resposta demora, a confiança cai antes da conversa começar.",
+          "A pessoa não vê seu bastidor. Ela sente o atrito.",
+          "O problema não precisa ser enorme para derrubar intenção.",
+          "A confiança começa a cair quando ninguém assume o próximo passo.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "mechanism",
       internalPurpose: "Introduzir a marca como solução prática.",
       eyebrow: brandName,
-      headline: `${brandName} entra antes do problema crescer.`,
-      body: cleanLine(value, 170),
+      headline: pickVariant(
+        [
+          `${brandName} entra antes do problema crescer.`,
+          `${brandName} transforma atrito em processo.`,
+          `${brandName} organiza o ponto que costuma escapar.`,
+          `${brandName} deixa a experiência menos solta.`,
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          cleanLine(value, 170),
+          "A solução aparece no momento em que a experiência começa a perder força.",
+          "O processo segura a conversa sem tirar o tom humano da marca.",
+          "A marca para de depender de improviso no ponto mais sensível.",
+        ],
+        variation,
+      ),
       footer: brandName,
     },
     {
       role: "proof",
       internalPurpose: "Explicar a diferenca pratica sem promessa exagerada.",
       eyebrow: "Na prática",
-      headline: "Menos improviso. Mais clareza.",
-      body: "A conversa ganha processo sem perder o tom humano da marca.",
+      headline: pickVariant(
+        [
+          "Menos improviso. Mais clareza.",
+          "Menos ruído. Mais presença.",
+          "Menos solto. Mais consistente.",
+          "Menos atraso. Mais controle.",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "A conversa ganha processo sem perder o tom humano da marca.",
+          "O atendimento deixa de depender de memória, sorte ou pressa.",
+          "A experiência fica mais previsível sem soar engessada.",
+          "O cliente sente continuidade, não remendo.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta,
     },
     {
       role: "close",
       internalPurpose: "Fechar com pergunta ou CTA.",
       eyebrow: brandName,
-      headline: firstPublicQuestion(input) || "Onde a conversa trava hoje?",
-      body: "Esse e o ponto que precisa aparecer antes da proxima campanha.",
+      headline: pickVariant(
+        [
+          firstPublicQuestion(input) || "Onde a conversa trava hoje?",
+          "Qual ponto da experiência ainda depende de improviso?",
+          "Onde seu cliente sente atrito antes de comprar?",
+          "Que detalhe pequeno está custando confiança?",
+        ],
+        variation,
+      ),
+      body: pickVariant(
+        [
+          "Esse é o ponto que precisa aparecer antes da próxima campanha.",
+          "Comece por aí antes de pedir mais atenção para a marca.",
+          "A melhora mais importante talvez esteja antes da oferta.",
+          "O próximo post deve nascer desse ponto, não de uma frase solta.",
+        ],
+        variation,
+      ),
       footer: input.typographicPiece.copy.cta || "Comente ou salve para revisar depois.",
     },
   ];
+}
+
+function pickVariant(values: string[], variation: number) {
+  const safeValues = values.filter(Boolean);
+  const index = safeValues.length ? variation % safeValues.length : 0;
+
+  return safeValues[index] || "";
 }
 
 function sanitizeSlideDraft(
@@ -780,6 +992,10 @@ function questionFromText(value: string) {
   const question = value.match(/([^.!?\n]*\?)/);
 
   return question ? cleanLine(question[1], 160) : "";
+}
+
+function stripOuterQuotes(value: string) {
+  return value.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
 }
 
 function applyPortugueseQualityGate(value: string) {

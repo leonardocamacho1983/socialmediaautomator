@@ -24,6 +24,9 @@ Included:
 - slide previews in the approved post detail page;
 - manual editing for eyebrow, headline, supporting copy, and footer per slide;
 - single-slide regeneration without rebuilding the whole carousel;
+- controlled copy variations so regenerating does not recreate identical slides;
+- persistent carousel generation index, preserved even after deleting a
+  carousel;
 - carousel approval state before export;
 - copy alerts for briefing language, weak patterns, and common Portuguese
   issues;
@@ -53,6 +56,7 @@ carouselPackage: CarouselPackage | null
 carouselStatus: "draft" | "approved"
 carouselApprovedAt: string | null
 carouselEvents: ApprovedPostCarouselEvent[]
+carouselGenerationIndex: number
 ```
 
 The current renderer is:
@@ -73,6 +77,12 @@ Editing or regenerating a slide returns the carousel to `draft`. The ZIP remains
 blocked until the carousel is approved again. This avoids exporting a sequence
 that has not been reviewed after copy changes.
 
+Carousel generation is still deterministic, but no longer identical on every
+click. Each whole-carousel generation uses the next controlled variation. Each
+single-slide regeneration also advances the variation for that slide. Deleting a
+carousel does not reset `carouselGenerationIndex`, so deleting and generating
+again produces the next variation instead of recreating the same package.
+
 ## Validation
 
 Run:
@@ -92,14 +102,16 @@ Manual validation:
 4. Edit one slide headline and click `Salvar slide`.
 5. Confirm the preview updates and the carousel status remains in review.
 6. Click `Regenerar slide` on one slide and confirm only that slide changes.
-7. Confirm the slide text does not include internal words like `metafora`,
+7. Click `Apagar carrossel`, generate again, and confirm the new carousel is
+   not identical to the deleted one.
+8. Confirm the slide text does not include internal words like `metafora`,
    `virada`, `fecho`, or `mostrar que`.
-8. Confirm common Portuguese words are accented, for example `não`, `você`,
+9. Confirm common Portuguese words are accented, for example `não`, `você`,
    `está`, `também`, `negócio`, `robô`, `ninguém`, and `já`.
-9. Confirm the final slide uses a natural question, not a long awkward prompt.
-10. Confirm `Baixar ZIP do carrossel` is blocked before approval.
-11. Click `Aprovar carrossel`.
-12. Click `Baixar ZIP do carrossel`.
-13. Confirm the ZIP includes `slides/slide-01.png` through
+10. Confirm the final slide uses a natural question, not a long awkward prompt.
+11. Confirm `Baixar ZIP do carrossel` is blocked before approval.
+12. Click `Aprovar carrossel`.
+13. Click `Baixar ZIP do carrossel`.
+14. Confirm the ZIP includes `slides/slide-01.png` through
    `slides/slide-06.png`, copy files, `roteiro.txt`, and `metadata.json`.
-14. Click `Apagar carrossel` and confirm the empty state returns.
+15. Click `Apagar carrossel` and confirm the empty state returns.
