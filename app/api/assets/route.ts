@@ -204,7 +204,6 @@ export async function POST(request: Request) {
     const result = await generateImage({
       model: gateway.image(model),
       prompt,
-      aspectRatio: "4:5",
       n: parsedRequest.data.count,
       maxImagesPerCall: 1,
       providerOptions: {
