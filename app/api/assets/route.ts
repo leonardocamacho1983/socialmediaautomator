@@ -263,10 +263,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.name === "GatewayAuthenticationError"
-    ) {
+    if (isGatewayAuthenticationFailure(error)) {
       return Response.json(
         {
           code: "AI_GATEWAY_AUTH_FAILED",
@@ -307,4 +304,17 @@ function compactRouteText(value: string, maxLength: number) {
   }
 
   return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function isGatewayAuthenticationFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.name === "GatewayAuthenticationError" ||
+    error.message.includes("AI Gateway authentication failed") ||
+    error.message.includes("No authentication provided") ||
+    error.message.includes("AI_GATEWAY_API_KEY")
+  );
 }
