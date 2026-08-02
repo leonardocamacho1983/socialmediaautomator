@@ -30,10 +30,12 @@ import {
   selectApprovedPostAssetComposition,
   regenerateApprovedPostCarouselSlide,
   updateApprovedPostCarouselSlide,
+  updateApprovedPostCaptionCopy,
   updateApprovedPostNotes,
   updateApprovedPostStatus,
   visualAssetRejectionReasons,
   type ApprovedPost,
+  type ApprovedPostCaptionCopyEdit,
   type ApprovedPostCarouselStatus,
   type ApprovedPostFinalPackageStatus,
   type ApprovedPostStatus,
@@ -55,6 +57,7 @@ import {
 } from "../../../lib/creative/carousel";
 import {
   buildCopyQualityReport,
+  suggestFirstComment,
   type CopyQualityReport,
 } from "../../../lib/creative/copy-quality";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
@@ -153,6 +156,17 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           view.typographicPiece,
         )
       : "";
+  const firstCommentSuggestion = view
+    ? suggestFirstComment({
+        brandProfile: view.brand,
+        caption: view.caption,
+        typographicCopy: view.typographicPiece.copy,
+      })
+    : "";
+  const firstCommentIssues =
+    copyQualityReport?.issues.filter(
+      (issue) => issue.field === "firstComment",
+    ) || [];
 
   function persistPosts(nextPosts: ApprovedPost[]) {
     setPosts(nextPosts);
@@ -173,6 +187,36 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     persistPosts(updateApprovedPostNotes(posts, postId, notes));
     setStatus("Notas salvas.");
     window.setTimeout(() => setStatus(""), 2400);
+  }
+
+  function saveCaptionCopy(changes: ApprovedPostCaptionCopyEdit) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(updateApprovedPostCaptionCopy(posts, post.id, changes));
+    setStatus("Copy salva. Revise o Quality Gate novamente.");
+    window.setTimeout(() => setStatus(""), 2800);
+  }
+
+  function applyFirstCommentSuggestion() {
+    if (!post || !view) {
+      return;
+    }
+
+    const suggestion = suggestFirstComment({
+      brandProfile: view.brand,
+      caption: view.caption,
+      typographicCopy: view.typographicPiece.copy,
+    });
+
+    persistPosts(
+      updateApprovedPostCaptionCopy(posts, post.id, {
+        firstComment: suggestion,
+      }),
+    );
+    setStatus("Sugestão aplicada ao primeiro comentário.");
+    window.setTimeout(() => setStatus(""), 2800);
   }
 
   function openPost() {
@@ -1123,6 +1167,8 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
 
       {copyQualityReport ? (
         <CopyQualityPanel
+          firstCommentSuggestion={firstCommentSuggestion}
+          onApplyFirstCommentSuggestion={applyFirstCommentSuggestion}
           report={copyQualityReport}
           onFixCopy={fixCopyQuality}
         />
@@ -1235,37 +1281,33 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       <section className="approved-detail-copy-grid">
         <article className="approved-detail-card">
           <p className="section-kicker">Legenda</p>
-          <div className="approved-detail-copy">
-            <p>{view?.caption || "Legenda indisponivel."}</p>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => copyText(view?.caption || "", "Legenda copiada.")}
-              disabled={!view?.caption}
-            >
-              Copiar legenda
-            </button>
-          </div>
+          <CaptionCopyEditor
+            emptyText="Legenda indisponível."
+            key={`caption-${view?.caption || ""}`}
+            label="Legenda"
+            onCopy={() => copyText(view?.caption || "", "Legenda copiada.")}
+            onSave={(caption) => saveCaptionCopy({ caption })}
+            rows={8}
+            value={view?.caption || ""}
+          />
         </article>
 
         <article className="approved-detail-card">
-          <p className="section-kicker">Primeiro comentario</p>
-          <div className="approved-detail-copy">
-            <p>{view?.firstComment || "Sem primeiro comentario."}</p>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() =>
-                copyText(
-                  view?.firstComment || "",
-                  "Primeiro comentario copiado.",
-                )
-              }
-              disabled={!view?.firstComment}
-            >
-              Copiar comentario
-            </button>
-          </div>
+          <p className="section-kicker">Primeiro comentário</p>
+          <FirstCommentCopyEditor
+            issues={firstCommentIssues}
+            key={`first-comment-${view?.firstComment || ""}`}
+            onApplySuggestion={applyFirstCommentSuggestion}
+            onCopy={() =>
+              copyText(
+                view?.firstComment || "",
+                "Primeiro comentário copiado.",
+              )
+            }
+            onSave={(firstComment) => saveCaptionCopy({ firstComment })}
+            suggestion={firstCommentSuggestion}
+            value={view?.firstComment || ""}
+          />
         </article>
 
         <article className="approved-detail-card">
@@ -1365,13 +1407,20 @@ type CarouselSlideEditorProps = {
 };
 
 function CopyQualityPanel({
+  firstCommentSuggestion,
+  onApplyFirstCommentSuggestion,
   report,
   onFixCopy,
 }: {
+  firstCommentSuggestion: string;
+  onApplyFirstCommentSuggestion: () => void;
   report: CopyQualityReport;
   onFixCopy: () => void;
 }) {
   const hasIssues = report.status === "review";
+  const hasFirstCommentBlocker = report.issues.some(
+    (issue) => issue.field === "firstComment" && issue.severity === "blocker",
+  );
 
   return (
     <section className="approved-detail-card copy-quality-card">
@@ -1390,6 +1439,20 @@ function CopyQualityPanel({
           {hasIssues ? "Revisar" : "OK"}
         </span>
       </div>
+
+      {hasFirstCommentBlocker && firstCommentSuggestion ? (
+        <div className="copy-suggestion-box copy-quality-suggestion">
+          <strong>Sugestão para o primeiro comentário</strong>
+          <p>{firstCommentSuggestion}</p>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onApplyFirstCommentSuggestion}
+          >
+            Aplicar sugestão
+          </button>
+        </div>
+      ) : null}
 
       <div className="copy-quality-summary">
         <strong>{report.summary}</strong>
@@ -1447,6 +1510,126 @@ function CopyQualityPanel({
         ))}
       </div>
     </section>
+  );
+}
+
+function CaptionCopyEditor({
+  emptyText,
+  label,
+  onCopy,
+  onSave,
+  rows,
+  value,
+}: {
+  emptyText: string;
+  label: string;
+  onCopy: () => void;
+  onSave: (value: string) => void;
+  rows: number;
+  value: string;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  const hasChanges = draft.trim() !== value.trim();
+
+  return (
+    <div className="approved-detail-copy copy-edit-panel">
+      <label className="field">
+        <span>{label}</span>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={emptyText}
+          rows={rows}
+        />
+      </label>
+      <div className="approved-detail-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => onSave(draft)}
+          disabled={!hasChanges}
+        >
+          Salvar copy
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={onCopy}
+          disabled={!value}
+        >
+          Copiar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FirstCommentCopyEditor({
+  issues,
+  onApplySuggestion,
+  onCopy,
+  onSave,
+  suggestion,
+  value,
+}: {
+  issues: CopyQualityReport["issues"];
+  onApplySuggestion: () => void;
+  onCopy: () => void;
+  onSave: (value: string) => void;
+  suggestion: string;
+  value: string;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  const hasChanges = draft.trim() !== value.trim();
+  const hasBlocker = issues.some((issue) => issue.severity === "blocker");
+
+  return (
+    <div className="approved-detail-copy copy-edit-panel">
+      <label className="field">
+        <span>Primeiro comentário</span>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Ex: Hoje, quem assume essa conversa quando seu time não está online?"
+          rows={5}
+        />
+      </label>
+
+      {hasBlocker && suggestion ? (
+        <div className="copy-suggestion-box">
+          <strong>Sugestão para destravar</strong>
+          <p>{suggestion}</p>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onApplySuggestion}
+          >
+            Aplicar sugestão
+          </button>
+        </div>
+      ) : null}
+
+      <div className="approved-detail-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => onSave(draft)}
+          disabled={!hasChanges}
+        >
+          Salvar comentário
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={onCopy}
+          disabled={!value}
+        >
+          Copiar comentário
+        </button>
+      </div>
+    </div>
   );
 }
 

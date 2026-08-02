@@ -1521,6 +1521,36 @@ h2 {
   line-height: 1.5;
 }
 
+.copy-edit-panel textarea {
+  min-height: 124px;
+}
+
+.copy-suggestion-box {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, #ffffff);
+  padding: 13px;
+}
+
+.copy-suggestion-box strong {
+  color: var(--foreground);
+  font-size: 0.88rem;
+}
+
+.copy-suggestion-box p {
+  color: var(--accent-strong);
+  font-weight: 760;
+}
+
+.copy-suggestion-box button {
+  width: fit-content;
+}
+
+.copy-quality-suggestion {
+  margin-bottom: 2px;
+}
+
 .approved-detail-actions {
   display: flex;
   flex-wrap: wrap;

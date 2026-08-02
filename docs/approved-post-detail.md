@@ -38,6 +38,10 @@ Included:
 - block final package approval while copy blockers remain;
 - apply safe deterministic copy fixes for accents, spacing, repeated
   punctuation, and dashes.
+- edit the selected caption and first comment directly from the approved post
+  detail page.
+- apply a deterministic first-comment suggestion when the gate blocks weak or
+  mechanical comment copy.
 
 Not included:
 
@@ -109,3 +113,8 @@ Manual validation:
 15. Add a copy issue such as `Nao e robo — transforme sua jornada`.
 16. Confirm package finalization is blocked while blocker issues remain.
 17. Click `Corrigir copy` and confirm only safe fixes are applied.
+18. Add a weak first comment and confirm the Quality Gate shows a suggested
+    replacement.
+19. Apply the first-comment suggestion and confirm the gate updates.
+20. Edit the first comment manually in the lower copy card and confirm the
+    saved text persists after reload.

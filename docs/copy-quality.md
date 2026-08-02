@@ -14,6 +14,10 @@ Included:
 - warnings for missing interaction cue, weak specificity, no hashtags, generic
   hashtags, short captions, and repeated visual/caption copy;
 - safe auto-fix button for accents, spacing, repeated punctuation, and dashes;
+- direct editing for the selected caption and first comment in the approved
+  post detail page;
+- deterministic first-comment suggestion when the gate blocks weak or mechanical
+  comment copy;
 - package finalization blocked while blocker issues remain;
 - carousel approval still blocked when slide copy has blocker issues.
 
@@ -65,3 +69,7 @@ Manual validation:
 8. Confirm safe corrections are applied and the package returns to open review.
 9. Confirm issues that cannot be safely fixed remain visible.
 10. Generate a carousel and confirm slide issues appear in the same gate.
+11. If `Primeiro comentário` is blocked, confirm the gate shows a suggested
+    replacement and `Aplicar sugestão` updates the comment.
+12. Confirm the lower `Primeiro comentário` card can be edited and saved
+    manually.

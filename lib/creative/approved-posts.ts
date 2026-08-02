@@ -70,6 +70,11 @@ export type VisualAssetRejection = {
   rejectedAt: string;
 };
 
+export type ApprovedPostCaptionCopyEdit = {
+  caption?: string;
+  firstComment?: string;
+};
+
 export type ApprovedPostVisualEvent = {
   id: string;
   type: ApprovedPostVisualEventType;
@@ -345,6 +350,69 @@ export function updateApprovedPostNotes(
         }
       : post,
   );
+}
+
+export function updateApprovedPostCaptionCopy(
+  posts: ApprovedPost[],
+  postId: string,
+  changes: ApprovedPostCaptionCopyEdit,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId || !post.projectSnapshot.captionPackage) {
+      return post;
+    }
+
+    let changed = false;
+    const selectedVariantId = post.projectSnapshot.captionPackage.selectedVariantId;
+    const captionPackage = {
+      ...post.projectSnapshot.captionPackage,
+      variants: post.projectSnapshot.captionPackage.variants.map((variant) => {
+        if (variant.id !== selectedVariantId) {
+          return variant;
+        }
+
+        const caption =
+          changes.caption === undefined
+            ? variant.caption
+            : polishEditableField(changes.caption, variant.caption, () => {
+                changed = true;
+              });
+        const firstComment =
+          changes.firstComment === undefined
+            ? variant.firstComment
+            : polishEditableField(
+                changes.firstComment,
+                variant.firstComment,
+                () => {
+                  changed = true;
+                },
+              );
+
+        return {
+          ...variant,
+          caption,
+          firstComment,
+        };
+      }),
+    };
+
+    if (!changed) {
+      return post;
+    }
+
+    return {
+      ...post,
+      finalPackageStatus: "open",
+      finalPackageReadyAt: null,
+      status: "approved",
+      projectSnapshot: {
+        ...post.projectSnapshot,
+        captionPackage,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  });
 }
 
 export function appendApprovedPostAssets(
@@ -964,6 +1032,20 @@ function polishField(value: string, onChange: () => void) {
   const polished = polishCopyText(value);
 
   if (polished !== value) {
+    onChange();
+  }
+
+  return polished;
+}
+
+function polishEditableField(
+  nextValue: string,
+  previousValue: string,
+  onChange: () => void,
+) {
+  const polished = polishCopyText(nextValue);
+
+  if (polished !== previousValue) {
     onChange();
   }
 

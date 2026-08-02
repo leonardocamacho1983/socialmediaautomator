@@ -475,6 +475,51 @@ export function cleanCopyLine(value: string, maxLength: number) {
   return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
 
+export function suggestFirstComment(input: {
+  brandProfile: BrandProfile;
+  caption: string;
+  typographicCopy: TypographicCopy;
+}) {
+  const source = normalizeForDetection(
+    [
+      input.brandProfile.brandName,
+      input.brandProfile.businessDescription,
+      input.brandProfile.productOrService,
+      input.brandProfile.valueProposition,
+      input.brandProfile.audience,
+      input.caption,
+      input.typographicCopy.headline,
+      input.typographicCopy.support,
+      input.typographicCopy.cta,
+    ].join(" "),
+  );
+
+  if (
+    source.includes("whatsapp") &&
+    (source.includes("venda") ||
+      source.includes("cliente") ||
+      source.includes("mensagem") ||
+      source.includes("resposta") ||
+      source.includes("atendimento"))
+  ) {
+    return "Hoje, quem assume essa conversa quando seu time não está online?";
+  }
+
+  if (source.includes("venda") || source.includes("compr")) {
+    return "Em que momento a venda costuma esfriar antes de alguém perceber?";
+  }
+
+  if (
+    source.includes("cliente") ||
+    source.includes("atendimento") ||
+    source.includes("suporte")
+  ) {
+    return "Qual pergunta do cliente ainda fica esperando alguém assumir?";
+  }
+
+  return "Qual parte dessa conversa mais parece o seu dia a dia hoje?";
+}
+
 function buildReport(checks: CopyQualityCheck[]): CopyQualityReport {
   const issues = checks.flatMap((check) => check.issues);
   const blockerCount = issues.filter((item) => item.severity === "blocker").length;
