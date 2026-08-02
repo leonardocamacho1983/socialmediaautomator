@@ -26,6 +26,7 @@ Included:
 - PNG download of the selected asset composition;
 - quick regeneration instructions before calling the image model again;
 - rejection reasons for generated assets;
+- undo for accidental asset rejection;
 - automatic regeneration prompt from the rejection reason;
 - final visual approval status;
 - visual status shown in `/approved`.
@@ -124,7 +125,9 @@ Manual validation:
 7. Test the three composition options.
 8. Reject one asset with a reason and confirm the regeneration instruction is
    prepared.
-9. Generate another asset if needed.
-10. Approve the final visual version.
-11. Confirm `/approved` shows the visual status.
-12. Download the PNG and confirm it is 1080x1350.
+9. Click `Desfazer rejeicao` and confirm the same asset becomes selectable and
+   selected again.
+10. Generate another asset if needed.
+11. Approve the final visual version.
+12. Confirm `/approved` shows the visual status.
+13. Download the PNG and confirm it is 1080x1350.

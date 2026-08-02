@@ -19,6 +19,7 @@ import {
   getVisualAssetRejectionReason,
   parseApprovedPosts,
   rejectApprovedPostAsset,
+  restoreApprovedPostAsset,
   selectApprovedPostAsset,
   selectApprovedPostAssetComposition,
   updateApprovedPostNotes,
@@ -290,6 +291,17 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       `Asset rejeitado: ${reason.label}. A instrucao de regeneracao foi preparada.`,
     );
     setStatus("Asset rejeitado.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
+  function restoreAsset(assetId: string) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(restoreApprovedPostAsset(posts, post.id, assetId));
+    setAssetStatus("Rejeicao desfeita. Asset selecionado novamente.");
+    setStatus("Rejeicao desfeita.");
     window.setTimeout(() => setStatus(""), 2400);
   }
 
@@ -659,9 +671,18 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                   </div>
                   <p>{asset.prompt}</p>
                   {rejectionReason ? (
-                    <span className="asset-rejection-note">
-                      Rejeitado: {rejectionReason.label}
-                    </span>
+                    <div className="asset-rejection-recovery">
+                      <span className="asset-rejection-note">
+                        Rejeitado: {rejectionReason.label}
+                      </span>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => restoreAsset(asset.id)}
+                      >
+                        Desfazer rejeicao
+                      </button>
+                    </div>
                   ) : null}
                   <button
                     className={selected ? "primary-button" : "secondary-button"}

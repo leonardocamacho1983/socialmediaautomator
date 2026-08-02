@@ -340,6 +340,39 @@ export function rejectApprovedPostAsset(
   );
 }
 
+export function restoreApprovedPostAsset(
+  posts: ApprovedPost[],
+  postId: string,
+  assetId: string,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId) {
+      return post;
+    }
+
+    const assetExists = post.generatedAssets.some(
+      (asset) => asset.id === assetId,
+    );
+    const visualAssetRejections = post.visualAssetRejections.filter(
+      (rejection) => rejection.assetId !== assetId,
+    );
+
+    return {
+      ...post,
+      selectedVisualAssetId: assetExists ? assetId : post.selectedVisualAssetId,
+      visualStatus: assetExists
+        ? "asset_generated"
+        : visualAssetRejections.length
+          ? "asset_rejected"
+          : nextVisualStatusForAssetSelection(post, post.selectedVisualAssetId),
+      visualApprovedAt: null,
+      status: assetExists ? "approved" : post.status,
+      visualAssetRejections,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
 export function approveApprovedPostVisual(
   posts: ApprovedPost[],
   postId: string,
