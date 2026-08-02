@@ -11,24 +11,15 @@ import {
 } from "../../lib/brand/profile";
 import {
   APPROVED_POSTS_STORAGE_KEY,
+  buildApprovedPostView,
   buildApprovedPostText,
   createDuplicateProjectFromApprovedPost,
-  getApprovedPostBrand,
-  getApprovedPostCaptionPackage,
-  getApprovedPostConcept,
-  getApprovedPostTypographicPiece,
   parseApprovedPosts,
   updateApprovedPostStatus,
   type ApprovedPost,
   type ApprovedPostStatus,
 } from "../../lib/creative/approved-posts";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../lib/creative/concepts";
-import { getSelectedCaptionVariant } from "../../lib/creative/captions";
-import {
-  getSelectedTypographicVariant,
-  renderTypographicSvg,
-  svgToDataUrl,
-} from "../../lib/creative/typographic-piece";
 import { downloadSvgAsPng, slugify } from "../create/export-utils";
 
 const statusLabels: Record<ApprovedPostStatus, string> = {
@@ -207,12 +198,18 @@ export function ApprovedPostLibrary() {
                   )}
 
                   <div className="approved-post-actions">
-                    <button
+                    <Link
                       className="primary-button"
+                      href={`/approved/${encodeURIComponent(post.id)}`}
+                    >
+                      Detalhes
+                    </Link>
+                    <button
+                      className="secondary-button"
                       type="button"
                       onClick={() => openPost(post)}
                     >
-                      Abrir
+                      Editar no fluxo
                     </button>
                     <button
                       className="secondary-button"
@@ -310,32 +307,4 @@ function saveProjectSnapshot(
     CREATIVE_PROJECT_STORAGE_KEY,
     JSON.stringify(projectSnapshot),
   );
-}
-
-function buildApprovedPostView(post: ApprovedPost) {
-  const brand = getApprovedPostBrand(post);
-  const concept = getApprovedPostConcept(post);
-  const typographicPiece = getApprovedPostTypographicPiece(post);
-  const captionPackage = getApprovedPostCaptionPackage(post);
-
-  if (!concept || !typographicPiece || !captionPackage) {
-    return null;
-  }
-
-  const typographicVariant = getSelectedTypographicVariant(typographicPiece);
-  const captionVariant = getSelectedCaptionVariant(captionPackage);
-
-  if (!captionVariant) {
-    return null;
-  }
-
-  const svg = renderTypographicSvg(typographicPiece, typographicVariant, brand);
-
-  return {
-    svg,
-    dataUrl: svgToDataUrl(svg),
-    caption: captionVariant.caption,
-    firstComment: captionVariant.firstComment,
-    hashtags: captionVariant.hashtags.join(" "),
-  };
 }

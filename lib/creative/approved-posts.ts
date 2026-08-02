@@ -1,7 +1,12 @@
 import type { BrandProfile } from "../brand/profile";
-import type { CaptionPackage } from "./captions";
+import { getSelectedCaptionVariant, type CaptionPackage } from "./captions";
 import type { CreativeConcept, CreativeProject } from "./concepts";
-import type { TypographicPiece } from "./typographic-piece";
+import {
+  getSelectedTypographicVariant,
+  renderTypographicSvg,
+  svgToDataUrl,
+  type TypographicPiece,
+} from "./typographic-piece";
 
 export const APPROVED_POSTS_STORAGE_KEY =
   "socialmediaautomator.approvedPosts.v1";
@@ -15,7 +20,12 @@ export type ApprovedPost = {
   approvedAt: string;
   updatedAt: string;
   status: ApprovedPostStatus;
+  notes: string;
   projectSnapshot: CreativeProject;
+};
+
+type StoredApprovedPost = Omit<ApprovedPost, "notes"> & {
+  notes?: string;
 };
 
 export function createApprovedPostFromProject(
@@ -37,6 +47,7 @@ export function createApprovedPostFromProject(
     approvedAt: project.finalPostPackage.approvedAt,
     updatedAt: new Date().toISOString(),
     status: "approved",
+    notes: "",
     projectSnapshot: project,
   };
 }
@@ -46,7 +57,12 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
     return [];
   }
 
-  return value.filter(isApprovedPost);
+  return value
+    .filter(isApprovedPost)
+    .map((post) => ({
+      ...post,
+      notes: post.notes || "",
+    }));
 }
 
 export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
@@ -56,7 +72,14 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
     return [post, ...posts].slice(0, 100);
   }
 
-  return posts.map((item, index) => (index === existingIndex ? post : item));
+  return posts.map((item, index) =>
+    index === existingIndex
+      ? {
+          ...post,
+          notes: item.notes || "",
+        }
+      : item,
+  );
 }
 
 export function updateApprovedPostStatus(
@@ -69,6 +92,22 @@ export function updateApprovedPostStatus(
       ? {
           ...post,
           status,
+          updatedAt: new Date().toISOString(),
+        }
+      : post,
+  );
+}
+
+export function updateApprovedPostNotes(
+  posts: ApprovedPost[],
+  postId: string,
+  notes: string,
+) {
+  return posts.map((post) =>
+    post.id === postId
+      ? {
+          ...post,
+          notes,
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -133,41 +172,62 @@ export function getApprovedPostCaptionPackage(
 }
 
 export function buildApprovedPostText(post: ApprovedPost) {
-  const concept = getApprovedPostConcept(post);
-  const captionPackage = getApprovedPostCaptionPackage(post);
+  const view = buildApprovedPostView(post);
 
-  if (!captionPackage) {
-    return "";
-  }
-
-  const selectedCaption =
-    captionPackage.variants.find(
-      (variant) => variant.id === captionPackage.selectedVariantId,
-    ) || captionPackage.variants[0];
-
-  if (!selectedCaption) {
+  if (!view) {
     return "";
   }
 
   return [
     `Marca: ${post.brandName}`,
-    `Conceito: ${concept?.title || post.title}`,
+    `Conceito: ${view.concept.title}`,
     "",
     "Legenda:",
-    selectedCaption.caption,
+    view.caption,
     "",
-    selectedCaption.firstComment
-      ? `Primeiro comentario:\n${selectedCaption.firstComment}`
-      : "",
-    selectedCaption.hashtags.length
-      ? `Hashtags:\n${selectedCaption.hashtags.join(" ")}`
-      : "",
+    view.firstComment ? `Primeiro comentario:\n${view.firstComment}` : "",
+    view.hashtags.length ? `Hashtags:\n${view.hashtags}` : "",
+    post.notes ? `Notas internas:\n${post.notes}` : "",
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function isApprovedPost(value: unknown): value is ApprovedPost {
+export function buildApprovedPostView(post: ApprovedPost) {
+  const brand = getApprovedPostBrand(post);
+  const concept = getApprovedPostConcept(post);
+  const typographicPiece = getApprovedPostTypographicPiece(post);
+  const captionPackage = getApprovedPostCaptionPackage(post);
+
+  if (!concept || !typographicPiece || !captionPackage) {
+    return null;
+  }
+
+  const typographicVariant = getSelectedTypographicVariant(typographicPiece);
+  const captionVariant = getSelectedCaptionVariant(captionPackage);
+
+  if (!captionVariant) {
+    return null;
+  }
+
+  const svg = renderTypographicSvg(typographicPiece, typographicVariant, brand);
+
+  return {
+    brand,
+    captionPackage,
+    captionVariant,
+    concept,
+    dataUrl: svgToDataUrl(svg),
+    firstComment: captionVariant.firstComment,
+    hashtags: captionVariant.hashtags.join(" "),
+    svg,
+    typographicPiece,
+    typographicVariant,
+    caption: captionVariant.caption,
+  };
+}
+
+function isApprovedPost(value: unknown): value is StoredApprovedPost {
   if (!value || typeof value !== "object") {
     return false;
   }

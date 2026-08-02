@@ -16,6 +16,7 @@ Included:
 - actions to reopen the package, duplicate it into a new project, export PNG,
   copy caption, copy first comment, copy the full package, and mark the post as
   ready to publish;
+- link each approved post to its detail page at `/approved/[postId]`;
 - link from the final package approval state to `/approved`;
 - link to start a new post after approval.
 
@@ -63,7 +64,8 @@ Manual validation:
 4. Open `/approved`.
 5. Confirm the approved post appears with preview, caption, first comment, and
    hashtags.
-6. Mark the post as ready.
-7. Reopen the post and confirm the final package is restored in `/create`.
-8. Duplicate the post and confirm it starts a new editable project without
+6. Open `Detalhes`.
+7. Mark the post as ready.
+8. Reopen the post and confirm the final package is restored in `/create`.
+9. Duplicate the post and confirm it starts a new editable project without
    carrying the previous final approval.

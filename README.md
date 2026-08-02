@@ -15,6 +15,7 @@ This repository currently contains:
 - Marco 3.1 Caption Workshop inside `/create`.
 - Marco 3.2 Final Post Package inside `/create`.
 - Marco 3.3 Approved Posts Library at `/approved`.
+- Marco 3.4 Approved Post Detail at `/approved/[postId]`.
 
 The app still does not generate image assets, carousels, automations,
 analytics, or publications.
