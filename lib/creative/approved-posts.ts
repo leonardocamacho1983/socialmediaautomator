@@ -536,25 +536,47 @@ export function finalizeApprovedPostPackage(
   posts: ApprovedPost[],
   postId: string,
 ): ApprovedPost[] {
-  return posts.map((post) =>
-    post.id === postId && post.visualStatus === "visual_approved"
-      ? {
-          ...post,
-          finalPackageStatus: "ready",
-          finalPackageReadyAt: new Date().toISOString(),
-          status: "ready_to_publish" as ApprovedPostStatus,
-          visualEvents: appendVisualEvent(post, {
-            type: "package_finalized",
-            label: "Pacote finalizado",
-            detail:
-              "O pacote final foi fechado com imagem, legenda, comentario e metadados.",
-            assetId: post.selectedVisualAssetId || undefined,
-            compositionId: post.selectedAssetCompositionId,
-          }),
-          updatedAt: new Date().toISOString(),
-        }
-      : post,
-  );
+  return posts.map((post) => {
+    if (post.id !== postId) {
+      return post;
+    }
+
+    const visualApprovedAt =
+      post.visualStatus === "visual_approved"
+        ? post.visualApprovedAt
+        : new Date().toISOString();
+    const postWithVisualApproval =
+      post.visualStatus === "visual_approved"
+        ? post
+        : {
+            ...post,
+            visualEvents: appendVisualEvent(post, {
+              type: "visual_approved",
+              label: "Visual aprovado",
+              detail: "A composicao visual atual foi aprovada no fechamento.",
+              assetId: post.selectedVisualAssetId || undefined,
+              compositionId: post.selectedAssetCompositionId,
+            }),
+          };
+
+    return {
+      ...postWithVisualApproval,
+      visualStatus: "visual_approved",
+      visualApprovedAt,
+      finalPackageStatus: "ready",
+      finalPackageReadyAt: new Date().toISOString(),
+      status: "ready_to_publish" as ApprovedPostStatus,
+      visualEvents: appendVisualEvent(postWithVisualApproval, {
+        type: "package_finalized",
+        label: "Pacote finalizado",
+        detail:
+          "O pacote final foi fechado com imagem, legenda, comentario e metadados.",
+        assetId: post.selectedVisualAssetId || undefined,
+        compositionId: post.selectedAssetCompositionId,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  });
 }
 
 export function getVisualAssetRejectionReason(

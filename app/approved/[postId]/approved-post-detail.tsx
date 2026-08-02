@@ -403,13 +403,13 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   }
 
   function finalizePackage() {
-    if (!post) {
+    if (!post || !view) {
+      setStatus("Post aprovado incompleto.");
       return;
     }
 
-    if (post.visualStatus !== "visual_approved") {
-      setStatus("Aprove o visual final antes de finalizar o pacote.");
-      setAssetStatus("Aprove o visual final antes de finalizar o pacote.");
+    if (!view.caption) {
+      setStatus("Legenda indisponivel. Revise o pacote antes de finalizar.");
       return;
     }
 
@@ -898,10 +898,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             className="primary-button"
             type="button"
             onClick={finalizePackage}
-            disabled={
-              post.visualStatus !== "visual_approved" ||
-              post.finalPackageStatus === "ready"
-            }
+            disabled={!view || post.finalPackageStatus === "ready"}
           >
             {post.finalPackageStatus === "ready"
               ? "Pacote finalizado"
@@ -918,8 +915,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         </div>
 
         <p className="approved-detail-muted">
-          O ZIP inclui PNG final 1080x1350, legenda, primeiro comentario,
-          hashtags, prompt do asset, metadados e historico visual.
+          Finalizar aprova o visual atual e libera o ZIP com PNG final
+          1080x1350, legenda, primeiro comentario, hashtags, prompt do asset,
+          metadados e historico visual.
         </p>
       </section>
 

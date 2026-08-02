@@ -24,7 +24,7 @@ Included:
 - choose between image-led composition variants;
 - reject weak assets with a reason;
 - prepare regeneration instructions from the rejection reason;
-- approve the final visual version;
+- approve the final visual version explicitly or through package finalization;
 - delete generated assets;
 - finalize the post package;
 - download a ZIP with final PNG, copy, metadata, and visual history;
@@ -86,6 +86,7 @@ Manual validation:
 8. Use `Editar no fluxo` and confirm the approved package opens in `/create`.
 9. Use `Duplicar` and confirm a new editable project is created without final
    approval.
-10. Approve a visual version and finalize the package.
+10. Finalize the package and confirm the current visual is approved
+    automatically if it was not approved before.
 11. Download the ZIP and confirm it includes final image, copy files, metadata,
     and visual history.

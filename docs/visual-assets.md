@@ -28,7 +28,8 @@ Included:
 - rejection reasons for generated assets;
 - undo for accidental asset rejection;
 - automatic regeneration prompt from the rejection reason;
-- final visual approval status;
+- final visual approval status, either explicit or automatic at package
+  finalization;
 - visual status shown in `/approved`;
 - final package status shown in `/approved`;
 - visual event history for generation, selection, rejection, restoration,
@@ -136,8 +137,8 @@ Manual validation:
 9. Click `Desfazer rejeicao` and confirm the same asset becomes selectable and
    selected again.
 10. Generate another asset if needed.
-11. Approve the final visual version.
-12. Finalize the package.
+11. Approve the final visual version or finalize the package directly.
+12. Confirm the package status becomes ready.
 13. Download the ZIP and confirm it includes:
     - `final/post-1080x1350.png`;
     - `copy/legenda.txt`;
