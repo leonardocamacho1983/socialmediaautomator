@@ -22,16 +22,21 @@ Included:
 - brand colors and font choices from the local brand profile;
 - browser-local persistence in `socialmediaautomator.approvedPosts.v1`;
 - slide previews in the approved post detail page;
+- manual editing for eyebrow, headline, supporting copy, and footer per slide;
+- single-slide regeneration without rebuilding the whole carousel;
+- carousel approval state before export;
+- copy alerts for briefing language, weak patterns, and common Portuguese
+  issues;
 - ZIP export with six PNGs, caption, first comment, hashtags, script, and
-  metadata;
-- delete and regenerate controls.
+  metadata, only after carousel approval;
+- delete, regenerate, approve, and export controls;
+- local carousel event history.
 
 Not included:
 
 - AI-generated carousel script;
 - Recraft;
 - image generation inside slides;
-- manual slide editor;
 - durable storage;
 - publishing;
 - scheduling;
@@ -45,6 +50,9 @@ Approved post records now include:
 
 ```ts
 carouselPackage: CarouselPackage | null
+carouselStatus: "draft" | "approved"
+carouselApprovedAt: string | null
+carouselEvents: ApprovedPostCarouselEvent[]
 ```
 
 The current renderer is:
@@ -60,6 +68,10 @@ briefing-like, unaccented, or weak slide copy with public copy.
 The package is intentionally browser-local for now. This keeps the milestone
 focused on whether the approved post can become a useful sequence before adding
 database persistence or automation.
+
+Editing or regenerating a slide returns the carousel to `draft`. The ZIP remains
+blocked until the carousel is approved again. This avoids exporting a sequence
+that has not been reviewed after copy changes.
 
 ## Validation
 
@@ -77,12 +89,17 @@ Manual validation:
 1. Open an approved post detail page.
 2. Click `Gerar carrossel`.
 3. Confirm six slides appear.
-4. Confirm the slide text does not include internal words like `metafora`,
+4. Edit one slide headline and click `Salvar slide`.
+5. Confirm the preview updates and the carousel status remains in review.
+6. Click `Regenerar slide` on one slide and confirm only that slide changes.
+7. Confirm the slide text does not include internal words like `metafora`,
    `virada`, `fecho`, or `mostrar que`.
-5. Confirm common Portuguese words are accented, for example `não`, `você`,
+8. Confirm common Portuguese words are accented, for example `não`, `você`,
    `está`, `também`, `negócio`, `robô`, `ninguém`, and `já`.
-6. Confirm the final slide uses a natural question, not a long awkward prompt.
-7. Click `Baixar ZIP do carrossel`.
-8. Confirm the ZIP includes `slides/slide-01.png` through
+9. Confirm the final slide uses a natural question, not a long awkward prompt.
+10. Confirm `Baixar ZIP do carrossel` is blocked before approval.
+11. Click `Aprovar carrossel`.
+12. Click `Baixar ZIP do carrossel`.
+13. Confirm the ZIP includes `slides/slide-01.png` through
    `slides/slide-06.png`, copy files, `roteiro.txt`, and `metadata.json`.
-9. Click `Apagar carrossel` and confirm the empty state returns.
+14. Click `Apagar carrossel` and confirm the empty state returns.

@@ -10,7 +10,9 @@ import { getSelectedCaptionVariant, type CaptionPackage } from "./captions";
 import {
   CURRENT_CAROUSEL_RENDERER,
   createCarouselPackage,
+  updateCarouselSlideCopy,
   type CarouselPackage,
+  type CarouselSlideCopyEdit,
 } from "./carousel";
 import type { CreativeConcept, CreativeProject } from "./concepts";
 import {
@@ -25,6 +27,7 @@ export const APPROVED_POSTS_STORAGE_KEY =
 
 export type ApprovedPostStatus = "approved" | "exported" | "ready_to_publish";
 export type ApprovedPostFinalPackageStatus = "open" | "ready";
+export type ApprovedPostCarouselStatus = "draft" | "approved";
 export type ApprovedPostVisualStatus =
   | "typographic_only"
   | "asset_generated"
@@ -40,6 +43,12 @@ export type ApprovedPostVisualEventType =
   | "asset_deleted"
   | "visual_approved"
   | "package_finalized";
+export type ApprovedPostCarouselEventType =
+  | "carousel_generated"
+  | "carousel_slide_edited"
+  | "carousel_slide_regenerated"
+  | "carousel_approved"
+  | "carousel_deleted";
 export type VisualAssetRejectionReasonId =
   | "contains_text"
   | "too_generic"
@@ -68,6 +77,15 @@ export type ApprovedPostVisualEvent = {
   createdAt: string;
   assetId?: string;
   compositionId?: AssetCompositionVariantId;
+};
+
+export type ApprovedPostCarouselEvent = {
+  id: string;
+  type: ApprovedPostCarouselEventType;
+  label: string;
+  detail: string;
+  createdAt: string;
+  slideId?: string;
 };
 
 export const visualAssetRejectionReasons: VisualAssetRejectionReason[] = [
@@ -112,7 +130,10 @@ export type ApprovedPost = {
   status: ApprovedPostStatus;
   finalPackageStatus: ApprovedPostFinalPackageStatus;
   finalPackageReadyAt: string | null;
+  carouselStatus: ApprovedPostCarouselStatus;
+  carouselApprovedAt: string | null;
   carouselPackage: CarouselPackage | null;
+  carouselEvents: ApprovedPostCarouselEvent[];
   notes: string;
   generatedAssets: GeneratedVisualAsset[];
   selectedVisualAssetId: string | null;
@@ -136,7 +157,10 @@ type StoredApprovedPost = Omit<
   | "visualEvents"
   | "finalPackageStatus"
   | "finalPackageReadyAt"
+  | "carouselStatus"
+  | "carouselApprovedAt"
   | "carouselPackage"
+  | "carouselEvents"
 > & {
   notes?: string;
   generatedAssets?: GeneratedVisualAsset[];
@@ -148,7 +172,10 @@ type StoredApprovedPost = Omit<
   visualEvents?: ApprovedPostVisualEvent[];
   finalPackageStatus?: string | null;
   finalPackageReadyAt?: string | null;
+  carouselStatus?: string | null;
+  carouselApprovedAt?: string | null;
   carouselPackage?: CarouselPackage | null;
+  carouselEvents?: ApprovedPostCarouselEvent[];
 };
 
 export function createApprovedPostFromProject(
@@ -172,7 +199,10 @@ export function createApprovedPostFromProject(
     status: "approved",
     finalPackageStatus: "open",
     finalPackageReadyAt: null,
+    carouselStatus: "draft",
+    carouselApprovedAt: null,
     carouselPackage: null,
+    carouselEvents: [],
     notes: "",
     generatedAssets: [],
     selectedVisualAssetId: null,
@@ -205,6 +235,9 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
         post.visualAssetRejections,
       );
       const visualEvents = normalizeVisualEvents(post.visualEvents);
+      const carouselPackage = isCarouselPackage(post.carouselPackage)
+        ? post.carouselPackage
+        : null;
 
       return {
         ...post,
@@ -229,9 +262,16 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
           typeof post.finalPackageReadyAt === "string"
             ? post.finalPackageReadyAt
             : null,
-        carouselPackage: isCarouselPackage(post.carouselPackage)
-          ? post.carouselPackage
-          : null,
+        carouselStatus:
+          carouselPackage && post.carouselStatus === "approved"
+            ? "approved"
+            : "draft",
+        carouselApprovedAt:
+          carouselPackage && typeof post.carouselApprovedAt === "string"
+            ? post.carouselApprovedAt
+            : null,
+        carouselPackage,
+        carouselEvents: normalizeCarouselEvents(post.carouselEvents),
       };
     });
 }
@@ -258,7 +298,10 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
           visualEvents: item.visualEvents || [],
           finalPackageStatus: item.finalPackageStatus || "open",
           finalPackageReadyAt: item.finalPackageReadyAt || null,
+          carouselStatus: item.carouselStatus || "draft",
+          carouselApprovedAt: item.carouselApprovedAt || null,
           carouselPackage: item.carouselPackage || null,
+          carouselEvents: item.carouselEvents || [],
         }
       : item,
   );
@@ -622,9 +665,149 @@ export function generateApprovedPostCarousel(
         typographicPiece,
         captionVariant,
       }),
+      carouselStatus: "draft",
+      carouselApprovedAt: null,
+      carouselEvents: appendCarouselEvent(post, {
+        type: "carousel_generated",
+        label: post.carouselPackage
+          ? "Carrossel regenerado"
+          : "Carrossel gerado",
+        detail:
+          "O roteiro visual do carrossel foi criado a partir do conceito aprovado.",
+      }),
       updatedAt: new Date().toISOString(),
     };
   });
+}
+
+export function updateApprovedPostCarouselSlide(
+  posts: ApprovedPost[],
+  postId: string,
+  slideId: string,
+  changes: CarouselSlideCopyEdit,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId || !post.carouselPackage) {
+      return post;
+    }
+
+    const targetSlide = post.carouselPackage.slides.find(
+      (slide) => slide.id === slideId,
+    );
+
+    if (!targetSlide) {
+      return post;
+    }
+
+    return {
+      ...post,
+      carouselPackage: {
+        ...post.carouselPackage,
+        slides: post.carouselPackage.slides.map((slide) =>
+          slide.id === slideId ? updateCarouselSlideCopy(slide, changes) : slide,
+        ),
+      },
+      carouselStatus: "draft",
+      carouselApprovedAt: null,
+      carouselEvents: appendCarouselEvent(post, {
+        type: "carousel_slide_edited",
+        label: `Slide ${targetSlide.index} editado`,
+        detail: "O texto publico do slide foi ajustado manualmente.",
+        slideId,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+export function regenerateApprovedPostCarouselSlide(
+  posts: ApprovedPost[],
+  postId: string,
+  slideId: string,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId || !post.carouselPackage) {
+      return post;
+    }
+
+    const currentSlide = post.carouselPackage.slides.find(
+      (slide) => slide.id === slideId,
+    );
+    const concept = getApprovedPostConcept(post);
+    const typographicPiece = getApprovedPostTypographicPiece(post);
+    const captionPackage = getApprovedPostCaptionPackage(post);
+    const captionVariant = captionPackage
+      ? getSelectedCaptionVariant(captionPackage)
+      : null;
+
+    if (!currentSlide || !concept || !typographicPiece) {
+      return post;
+    }
+
+    const freshPackage = createCarouselPackage({
+      postId: post.id,
+      brandProfile: post.projectSnapshot.brandSnapshot,
+      briefing: post.projectSnapshot.briefing,
+      concept,
+      typographicPiece,
+      captionVariant,
+    });
+    const freshSlide =
+      freshPackage.slides.find((slide) => slide.role === currentSlide.role) ||
+      freshPackage.slides[currentSlide.index - 1];
+
+    if (!freshSlide) {
+      return post;
+    }
+
+    return {
+      ...post,
+      carouselPackage: {
+        ...post.carouselPackage,
+        slides: post.carouselPackage.slides.map((slide) =>
+          slide.id === slideId
+            ? {
+                ...freshSlide,
+                id: currentSlide.id,
+                index: currentSlide.index,
+              }
+            : slide,
+        ),
+      },
+      carouselStatus: "draft",
+      carouselApprovedAt: null,
+      carouselEvents: appendCarouselEvent(post, {
+        type: "carousel_slide_regenerated",
+        label: `Slide ${currentSlide.index} regenerado`,
+        detail:
+          "Somente este slide voltou para a versao deterministica mais recente.",
+        slideId,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+export function approveApprovedPostCarousel(
+  posts: ApprovedPost[],
+  postId: string,
+): ApprovedPost[] {
+  return posts.map((post) =>
+    post.id === postId && post.carouselPackage
+      ? {
+          ...post,
+          carouselStatus: "approved",
+          carouselApprovedAt: new Date().toISOString(),
+          carouselEvents: appendCarouselEvent(post, {
+            type: "carousel_approved",
+            label: "Carrossel aprovado",
+            detail:
+              "A sequencia foi aprovada e o ZIP do carrossel foi liberado.",
+          }),
+          updatedAt: new Date().toISOString(),
+        }
+      : post,
+  );
 }
 
 export function deleteApprovedPostCarousel(
@@ -636,6 +819,13 @@ export function deleteApprovedPostCarousel(
       ? {
           ...post,
           carouselPackage: null,
+          carouselStatus: "draft",
+          carouselApprovedAt: null,
+          carouselEvents: appendCarouselEvent(post, {
+            type: "carousel_deleted",
+            label: "Carrossel apagado",
+            detail: "A sequencia de slides foi removida deste pacote.",
+          }),
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -891,6 +1081,14 @@ function normalizeVisualEvents(value: unknown) {
   return value.filter(isApprovedPostVisualEvent).slice(0, 48);
 }
 
+function normalizeCarouselEvents(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isApprovedPostCarouselEvent).slice(0, 48);
+}
+
 function isCarouselPackage(value: unknown): value is CarouselPackage {
   if (!value || typeof value !== "object") {
     return false;
@@ -940,6 +1138,20 @@ function appendVisualEvent(
       ...event,
     },
     ...post.visualEvents,
+  ].slice(0, 48);
+}
+
+function appendCarouselEvent(
+  post: ApprovedPost,
+  event: Omit<ApprovedPostCarouselEvent, "id" | "createdAt">,
+) {
+  return [
+    {
+      id: `carousel-event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      ...event,
+    },
+    ...post.carouselEvents,
   ].slice(0, 48);
 }
 
@@ -1018,6 +1230,37 @@ function isApprovedPostVisualEventType(
     value === "asset_deleted" ||
     value === "visual_approved" ||
     value === "package_finalized"
+  );
+}
+
+function isApprovedPostCarouselEvent(
+  value: unknown,
+): value is ApprovedPostCarouselEvent {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    isApprovedPostCarouselEventType(candidate.type) &&
+    typeof candidate.label === "string" &&
+    typeof candidate.detail === "string" &&
+    typeof candidate.createdAt === "string" &&
+    (candidate.slideId === undefined || typeof candidate.slideId === "string")
+  );
+}
+
+function isApprovedPostCarouselEventType(
+  value: unknown,
+): value is ApprovedPostCarouselEventType {
+  return (
+    value === "carousel_generated" ||
+    value === "carousel_slide_edited" ||
+    value === "carousel_slide_regenerated" ||
+    value === "carousel_approved" ||
+    value === "carousel_deleted"
   );
 }
 

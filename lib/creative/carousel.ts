@@ -37,6 +37,15 @@ export type CarouselPackage = {
   slides: CarouselSlide[];
 };
 
+export type CarouselSlideCopyEdit = Partial<
+  Pick<CarouselSlide, "eyebrow" | "headline" | "body" | "footer">
+>;
+
+export type CarouselSlideCopyIssue = {
+  field: keyof CarouselSlideCopyEdit;
+  label: string;
+};
+
 export const CURRENT_CAROUSEL_RENDERER = "deterministic-carousel-v3";
 
 export const carouselSlideRoleLabels: Record<CarouselSlideRole, string> = {
@@ -98,6 +107,70 @@ export function carouselSlideToDataUrl(
   brandProfile: BrandProfile,
 ) {
   return svgToDataUrl(renderCarouselSlideSvg(carouselPackage, slide, brandProfile));
+}
+
+export function updateCarouselSlideCopy(
+  slide: CarouselSlide,
+  changes: CarouselSlideCopyEdit,
+): CarouselSlide {
+  return {
+    ...slide,
+    eyebrow:
+      changes.eyebrow === undefined
+        ? slide.eyebrow
+        : polishCarouselCopyField(changes.eyebrow, slide.eyebrow, 34),
+    headline:
+      changes.headline === undefined
+        ? slide.headline
+        : polishCarouselCopyField(changes.headline, slide.headline, 94),
+    body:
+      changes.body === undefined
+        ? slide.body
+        : polishCarouselCopyField(changes.body, slide.body, 180),
+    footer:
+      changes.footer === undefined
+        ? slide.footer
+        : polishCarouselCopyField(changes.footer, slide.footer, 56),
+  };
+}
+
+export function evaluateCarouselSlideCopy(
+  slide: CarouselSlide,
+): CarouselSlideCopyIssue[] {
+  const fields = {
+    eyebrow: slide.eyebrow,
+    headline: slide.headline,
+    body: slide.body,
+    footer: slide.footer,
+  } satisfies Record<keyof CarouselSlideCopyEdit, string>;
+
+  return Object.entries(fields).flatMap(([field, value]) => {
+    const issues: CarouselSlideCopyIssue[] = [];
+    const typedField = field as keyof CarouselSlideCopyEdit;
+
+    if (hasBriefingLanguage(value)) {
+      issues.push({
+        field: typedField,
+        label: "Parece linguagem de briefing, nao texto publico.",
+      });
+    }
+
+    if (hasWeakCarouselCopy(value)) {
+      issues.push({
+        field: typedField,
+        label: "Copy fraca ou mecanica. Reescreva antes de aprovar.",
+      });
+    }
+
+    if (applyPortugueseQualityGate(value) !== value) {
+      issues.push({
+        field: typedField,
+        label: "Revise acentos e portugues antes de aprovar.",
+      });
+    }
+
+    return issues;
+  });
 }
 
 function buildSlides(input: CarouselGenerationInput, seed: number) {
@@ -321,7 +394,7 @@ function publicFallbackForRole(
 }
 
 function sanitizePublicCopy(value: string, fallback: string, maxLength: number) {
-  const cleaned = cleanLine(applyPortugueseQualityGate(value), maxLength);
+  const cleaned = polishCarouselCopyField(value, fallback, maxLength);
 
   if (
     !cleaned ||
@@ -332,6 +405,17 @@ function sanitizePublicCopy(value: string, fallback: string, maxLength: number) 
   }
 
   return cleaned;
+}
+
+function polishCarouselCopyField(
+  value: string,
+  fallback: string,
+  maxLength: number,
+) {
+  return (
+    cleanLine(applyPortugueseQualityGate(value), maxLength) ||
+    cleanLine(applyPortugueseQualityGate(fallback), maxLength)
+  );
 }
 
 function hasBriefingLanguage(value: string) {

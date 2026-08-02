@@ -12,6 +12,7 @@ import {
 import {
   APPROVED_POSTS_STORAGE_KEY,
   appendApprovedPostAssets,
+  approveApprovedPostCarousel,
   approveApprovedPostVisual,
   buildApprovedPostText,
   buildApprovedPostView,
@@ -26,10 +27,13 @@ import {
   restoreApprovedPostAsset,
   selectApprovedPostAsset,
   selectApprovedPostAssetComposition,
+  regenerateApprovedPostCarouselSlide,
+  updateApprovedPostCarouselSlide,
   updateApprovedPostNotes,
   updateApprovedPostStatus,
   visualAssetRejectionReasons,
   type ApprovedPost,
+  type ApprovedPostCarouselStatus,
   type ApprovedPostFinalPackageStatus,
   type ApprovedPostStatus,
   type ApprovedPostVisualStatus,
@@ -43,7 +47,10 @@ import {
 import {
   carouselSlideRoleLabels,
   carouselSlideToDataUrl,
+  evaluateCarouselSlideCopy,
   renderCarouselSlideSvg,
+  type CarouselSlide,
+  type CarouselSlideCopyEdit,
 } from "../../../lib/creative/carousel";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import {
@@ -71,6 +78,11 @@ const finalPackageStatusLabels: Record<ApprovedPostFinalPackageStatus, string> =
     open: "Pacote em aberto",
     ready: "Pacote pronto",
   };
+
+const carouselStatusLabels: Record<ApprovedPostCarouselStatus, string> = {
+  draft: "Carrossel em revisao",
+  approved: "Carrossel aprovado",
+};
 
 const visualStatusLabels: Record<ApprovedPostVisualStatus, string> = {
   typographic_only: "So tipografico",
@@ -444,8 +456,52 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     }
 
     persistPosts(generateApprovedPostCarousel(posts, post.id));
-    setStatus("Carrossel gerado.");
+    setStatus("Carrossel gerado em modo revisao.");
     window.setTimeout(() => setStatus(""), 2600);
+  }
+
+  function saveCarouselSlide(
+    slideId: string,
+    changes: CarouselSlideCopyEdit,
+  ) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(updateApprovedPostCarouselSlide(posts, post.id, slideId, changes));
+    setStatus("Slide salvo. Revise e aprove o carrossel novamente.");
+    window.setTimeout(() => setStatus(""), 2800);
+  }
+
+  function regenerateCarouselSlide(slideId: string) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(regenerateApprovedPostCarouselSlide(posts, post.id, slideId));
+    setStatus("Slide regenerado. O carrossel voltou para revisao.");
+    window.setTimeout(() => setStatus(""), 2800);
+  }
+
+  function approveCarousel() {
+    if (!post?.carouselPackage) {
+      setStatus("Gere o carrossel antes de aprovar.");
+      return;
+    }
+
+    const issues = post.carouselPackage.slides.flatMap((slide) =>
+      evaluateCarouselSlideCopy(slide),
+    );
+
+    if (issues.length) {
+      setStatus("Ainda ha alertas de copy nos slides. Revise antes de aprovar.");
+      window.setTimeout(() => setStatus(""), 3400);
+      return;
+    }
+
+    persistPosts(approveApprovedPostCarousel(posts, post.id));
+    setStatus("Carrossel aprovado. ZIP liberado.");
+    window.setTimeout(() => setStatus(""), 2800);
   }
 
   function deleteCarousel() {
@@ -461,6 +517,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   async function downloadCarouselZip() {
     if (!post || !view || !post.carouselPackage) {
       setStatus("Gere o carrossel antes de baixar o ZIP.");
+      return;
+    }
+
+    if (post.carouselStatus !== "approved") {
+      setStatus("Aprove o carrossel antes de baixar o ZIP.");
       return;
     }
 
@@ -1024,19 +1085,22 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </div>
           <span
             className={
-              post.carouselPackage
+              post.carouselPackage && post.carouselStatus === "approved"
                 ? "carousel-status carousel-status-ready"
                 : "carousel-status"
             }
           >
-            {post.carouselPackage ? "Carrossel gerado" : "Sem carrossel"}
+            {post.carouselPackage
+              ? carouselStatusLabels[post.carouselStatus]
+              : "Sem carrossel"}
           </span>
         </div>
 
         <p className="approved-detail-muted">
           Esta primeira versao transforma o conceito escolhido em seis slides
-          1080x1350. Ainda e deterministica: nao usa Recraft, video, publicacao
-          ou automacao.
+          1080x1350. Revise a copy de cada slide, aprove a sequencia e so entao
+          baixe o ZIP. Ainda e deterministica: nao usa Recraft, video,
+          publicacao ou automacao.
         </p>
 
         <div className="approved-detail-actions">
@@ -1051,8 +1115,22 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           <button
             className="secondary-button"
             type="button"
+            onClick={approveCarousel}
+            disabled={!post.carouselPackage || post.carouselStatus === "approved"}
+          >
+            {post.carouselStatus === "approved"
+              ? "Carrossel aprovado"
+              : "Aprovar carrossel"}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
             onClick={downloadCarouselZip}
-            disabled={!view || !post.carouselPackage}
+            disabled={
+              !view ||
+              !post.carouselPackage ||
+              post.carouselStatus !== "approved"
+            }
           >
             Baixar ZIP do carrossel
           </button>
@@ -1070,23 +1148,15 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         {post.carouselPackage && view ? (
           <div className="carousel-preview-grid" aria-label="Slides gerados">
             {post.carouselPackage.slides.map((slide) => (
-              <article className="carousel-slide-card" key={slide.id}>
-                <img
-                  alt={`Slide ${slide.index}: ${slide.headline}`}
-                  height={1350}
-                  src={carouselSlideToDataUrl(
-                    post.carouselPackage!,
-                    slide,
-                    view.brand,
-                  )}
-                  width={1080}
-                />
-                <div>
-                  <strong>Slide {slide.index}</strong>
-                  <span>{carouselSlideRoleLabels[slide.role]}</span>
-                </div>
-                <p>{slide.headline}</p>
-              </article>
+              <CarouselSlideEditor
+                key={`${slide.id}-${slide.eyebrow}-${slide.headline}-${slide.body}-${slide.footer}`}
+                brand={view.brand}
+                carouselPackage={post.carouselPackage!}
+                isApproved={post.carouselStatus === "approved"}
+                onRegenerate={() => regenerateCarouselSlide(slide.id)}
+                onSave={(changes) => saveCarouselSlide(slide.id, changes)}
+                slide={slide}
+              />
             ))}
           </div>
         ) : (
@@ -1098,6 +1168,17 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </p>
           </div>
         )}
+        {post.carouselEvents.length ? (
+          <div className="carousel-history-list" aria-label="Historico do carrossel">
+            {post.carouselEvents.slice(0, 4).map((event) => (
+              <article className="visual-history-item" key={event.id}>
+                <strong>{event.label}</strong>
+                <span>{new Date(event.createdAt).toLocaleString("pt-BR")}</span>
+                <p>{event.detail}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="approved-detail-copy-grid">
@@ -1222,6 +1303,127 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     </main>
   );
 }
+
+type CarouselSlideEditorProps = {
+  brand: BrandProfile;
+  carouselPackage: NonNullable<ApprovedPost["carouselPackage"]>;
+  isApproved: boolean;
+  onRegenerate: () => void;
+  onSave: (changes: CarouselSlideCopyEdit) => void;
+  slide: CarouselSlide;
+};
+
+function CarouselSlideEditor({
+  brand,
+  carouselPackage,
+  isApproved,
+  onRegenerate,
+  onSave,
+  slide,
+}: CarouselSlideEditorProps) {
+  const [eyebrow, setEyebrow] = useState(slide.eyebrow);
+  const [headline, setHeadline] = useState(slide.headline);
+  const [body, setBody] = useState(slide.body);
+  const [footer, setFooter] = useState(slide.footer);
+
+  const draftSlide = {
+    ...slide,
+    eyebrow,
+    headline,
+    body,
+    footer,
+  };
+  const issues = evaluateCarouselSlideCopy(draftSlide);
+  const hasChanges =
+    eyebrow !== slide.eyebrow ||
+    headline !== slide.headline ||
+    body !== slide.body ||
+    footer !== slide.footer;
+
+  return (
+    <article className="carousel-slide-card">
+      <img
+        alt={`Slide ${slide.index}: ${headline}`}
+        height={1350}
+        src={carouselSlideToDataUrl(carouselPackage, draftSlide, brand)}
+        width={1080}
+      />
+      <div className="carousel-slide-card-header">
+        <strong>Slide {slide.index}</strong>
+        <span>{carouselSlideRoleLabels[slide.role]}</span>
+      </div>
+      <label className="field carousel-slide-field">
+        <span>Marcador</span>
+        <input
+          value={eyebrow}
+          onChange={(event) => setEyebrow(event.target.value)}
+        />
+      </label>
+      <label className="field carousel-slide-field">
+        <span>Headline</span>
+        <textarea
+          value={headline}
+          onChange={(event) => setHeadline(event.target.value)}
+          rows={3}
+        />
+      </label>
+      <label className="field carousel-slide-field">
+        <span>Apoio</span>
+        <textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          rows={4}
+        />
+      </label>
+      <label className="field carousel-slide-field">
+        <span>Rodape</span>
+        <input
+          value={footer}
+          onChange={(event) => setFooter(event.target.value)}
+        />
+      </label>
+      {issues.length ? (
+        <div className="carousel-slide-issues" role="alert">
+          {issues.slice(0, 3).map((issue, index) => (
+            <p key={`${issue.field}-${index}`}>
+              <strong>{carouselIssueFieldLabels[issue.field]}:</strong>{" "}
+              {issue.label}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {isApproved && hasChanges ? (
+        <p className="carousel-slide-note">
+          Alterar este slide volta o carrossel para revisao.
+        </p>
+      ) : null}
+      <div className="carousel-slide-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => onSave({ eyebrow, headline, body, footer })}
+          disabled={!hasChanges}
+        >
+          Salvar slide
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={onRegenerate}
+        >
+          Regenerar slide
+        </button>
+      </div>
+    </article>
+  );
+}
+
+const carouselIssueFieldLabels: Record<keyof CarouselSlideCopyEdit, string> = {
+  eyebrow: "Marcador",
+  headline: "Headline",
+  body: "Apoio",
+  footer: "Rodape",
+};
 
 function readApprovedPosts() {
   try {

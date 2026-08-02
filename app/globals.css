@@ -1803,18 +1803,18 @@ h2 {
   object-fit: cover;
 }
 
-.carousel-slide-card div {
+.carousel-slide-card-header {
   display: flex;
   gap: 8px;
   align-items: baseline;
   justify-content: space-between;
 }
 
-.carousel-slide-card strong {
+.carousel-slide-card-header strong {
   font-size: 0.92rem;
 }
 
-.carousel-slide-card span {
+.carousel-slide-card-header span {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 820;
@@ -1826,6 +1826,58 @@ h2 {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.carousel-slide-field {
+  gap: 6px;
+}
+
+.carousel-slide-field span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.carousel-slide-field input,
+.carousel-slide-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  padding: 10px;
+}
+
+.carousel-slide-issues {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #f0b6a2;
+  background: #fff7f3;
+  padding: 10px;
+}
+
+.carousel-slide-issues p {
+  color: #7c2c19;
+}
+
+.carousel-slide-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.carousel-slide-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.carousel-history-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .carousel-empty {
