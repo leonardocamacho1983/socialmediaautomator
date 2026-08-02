@@ -7,6 +7,7 @@ const checks = [
   "Marco 3.2 com pacote final de post tipografico",
   "Marco 3.3 com biblioteca local de posts aprovados",
   "Marco 3.4 com detalhe individual do post aprovado",
+  "Marco 3.5 com cockpit, filtros e busca dos aprovados",
   "Sem imagens geradas, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];

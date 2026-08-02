@@ -193,6 +193,29 @@ export function buildApprovedPostText(post: ApprovedPost) {
     .join("\n");
 }
 
+export function buildApprovedPostSearchText(post: ApprovedPost) {
+  const concept = getApprovedPostConcept(post);
+  const captionPackage = getApprovedPostCaptionPackage(post);
+  const selectedCaption = captionPackage
+    ? getSelectedCaptionVariant(captionPackage)
+    : null;
+
+  return [
+    post.title,
+    post.brandName,
+    post.notes,
+    post.status,
+    concept?.title,
+    concept?.centralIdea,
+    concept?.hook,
+    selectedCaption?.caption,
+    selectedCaption?.firstComment,
+    selectedCaption?.hashtags.join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function buildApprovedPostView(post: ApprovedPost) {
   const brand = getApprovedPostBrand(post);
   const concept = getApprovedPostConcept(post);

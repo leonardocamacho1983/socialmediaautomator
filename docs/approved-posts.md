@@ -13,6 +13,9 @@ Included:
 - local browser library of approved final post packages;
 - preview of the selected typographic PNG composition;
 - selected caption, first comment, and hashtags;
+- cockpit counters for all, approved, exported, and ready to publish posts;
+- search by title, brand, caption, comment, hashtags, concept, or notes;
+- filter by operational status;
 - actions to reopen the package, duplicate it into a new project, export PNG,
   copy caption, copy first comment, copy the full package, and mark the post as
   ready to publish;
@@ -64,8 +67,12 @@ Manual validation:
 4. Open `/approved`.
 5. Confirm the approved post appears with preview, caption, first comment, and
    hashtags.
-6. Open `Detalhes`.
-7. Mark the post as ready.
-8. Reopen the post and confirm the final package is restored in `/create`.
-9. Duplicate the post and confirm it starts a new editable project without
+6. Confirm the cockpit counters reflect the current statuses.
+7. Filter by status and confirm the visible list changes.
+8. Search by title, brand, hashtag, or caption text.
+9. Clear filters.
+10. Open `Detalhes`.
+11. Mark the post as ready.
+12. Reopen the post and confirm the final package is restored in `/create`.
+13. Duplicate the post and confirm it starts a new editable project without
    carrying the previous final approval.

@@ -11,6 +11,7 @@ import {
 } from "../../lib/brand/profile";
 import {
   APPROVED_POSTS_STORAGE_KEY,
+  buildApprovedPostSearchText,
   buildApprovedPostView,
   buildApprovedPostText,
   createDuplicateProjectFromApprovedPost,
@@ -28,9 +29,18 @@ const statusLabels: Record<ApprovedPostStatus, string> = {
   ready_to_publish: "Pronto para publicar",
 };
 
+type ApprovedPostFilter = ApprovedPostStatus | "all";
+
+const filterLabels: Record<ApprovedPostFilter, string> = {
+  all: "Todos",
+  ...statusLabels,
+};
+
 export function ApprovedPostLibrary() {
   const router = useRouter();
   const [posts, setPosts] = useState<ApprovedPost[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ApprovedPostFilter>("all");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -47,6 +57,29 @@ export function ApprovedPostLibrary() {
       ),
     [posts],
   );
+  const statusCounts = useMemo(() => countPostsByStatus(posts), [posts]);
+  const normalizedSearchTerm = normalizeSearchText(searchTerm);
+  const visiblePosts = useMemo(
+    () =>
+      sortedPosts.filter((post) => {
+        const matchesStatus =
+          statusFilter === "all" || post.status === statusFilter;
+
+        if (!matchesStatus) {
+          return false;
+        }
+
+        if (!normalizedSearchTerm) {
+          return true;
+        }
+
+        return normalizeSearchText(buildApprovedPostSearchText(post)).includes(
+          normalizedSearchTerm,
+        );
+      }),
+    [normalizedSearchTerm, sortedPosts, statusFilter],
+  );
+  const hasActiveFilters = Boolean(searchTerm.trim()) || statusFilter !== "all";
 
   function persistPosts(nextPosts: ApprovedPost[]) {
     setPosts(nextPosts);
@@ -122,11 +155,11 @@ export function ApprovedPostLibrary() {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 3.3</p>
+          <p className="eyebrow">Marco 3.5</p>
           <h1>Posts aprovados</h1>
           <p className="lead">
-            Biblioteca local dos pacotes finais aprovados. Ainda sem Zernio,
-            calendario, publicacao ou automacao.
+            Cockpit local dos pacotes finais aprovados. Ainda sem Zernio,
+            calendario, publicacao, banco de dados ou automacao.
           </p>
         </div>
       </header>
@@ -148,9 +181,107 @@ export function ApprovedPostLibrary() {
         ) : null}
       </section>
 
-      {sortedPosts.length ? (
+      <section className="approved-cockpit" aria-label="Resumo dos aprovados">
+        <button
+          className={
+            statusFilter === "all"
+              ? "approved-metric approved-metric-active"
+              : "approved-metric"
+          }
+          type="button"
+          onClick={() => setStatusFilter("all")}
+        >
+          <span>{filterLabels.all}</span>
+          <strong>{posts.length}</strong>
+        </button>
+        <button
+          className={
+            statusFilter === "approved"
+              ? "approved-metric approved-metric-active"
+              : "approved-metric"
+          }
+          type="button"
+          onClick={() => setStatusFilter("approved")}
+        >
+          <span>{filterLabels.approved}</span>
+          <strong>{statusCounts.approved}</strong>
+        </button>
+        <button
+          className={
+            statusFilter === "exported"
+              ? "approved-metric approved-metric-active"
+              : "approved-metric"
+          }
+          type="button"
+          onClick={() => setStatusFilter("exported")}
+        >
+          <span>{filterLabels.exported}</span>
+          <strong>{statusCounts.exported}</strong>
+        </button>
+        <button
+          className={
+            statusFilter === "ready_to_publish"
+              ? "approved-metric approved-metric-active"
+              : "approved-metric"
+          }
+          type="button"
+          onClick={() => setStatusFilter("ready_to_publish")}
+        >
+          <span>{filterLabels.ready_to_publish}</span>
+          <strong>{statusCounts.ready_to_publish}</strong>
+        </button>
+      </section>
+
+      <section className="approved-filter-panel" aria-label="Filtros">
+        <label className="field approved-search-field">
+          <span>Busca</span>
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Buscar por titulo, marca, legenda, hashtag ou nota"
+          />
+        </label>
+        <label className="field approved-status-field">
+          <span>Status</span>
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as ApprovedPostFilter)
+            }
+          >
+            <option value="all">Todos</option>
+            <option value="approved">Aprovado</option>
+            <option value="exported">Exportado</option>
+            <option value="ready_to_publish">Pronto para publicar</option>
+          </select>
+        </label>
+        <div className="approved-filter-summary">
+          <strong>
+            {visiblePosts.length} de {posts.length}
+          </strong>
+          <span>
+            {visiblePosts.length === 1
+              ? "post visivel"
+              : "posts visiveis"}
+          </span>
+        </div>
+        {hasActiveFilters ? (
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          >
+            Limpar filtros
+          </button>
+        ) : null}
+      </section>
+
+      {visiblePosts.length ? (
         <section className="approved-post-grid" aria-label="Posts aprovados">
-          {sortedPosts.map((post) => {
+          {visiblePosts.map((post) => {
             const view = buildApprovedPostView(post);
 
             return (
@@ -270,6 +401,24 @@ export function ApprovedPostLibrary() {
             );
           })}
         </section>
+      ) : posts.length ? (
+        <section className="approved-empty">
+          <strong>Nenhum post encontrado.</strong>
+          <p>
+            Ajuste a busca ou limpe os filtros para voltar a ver todos os
+            aprovados.
+          </p>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          >
+            Limpar filtros
+          </button>
+        </section>
       ) : (
         <section className="approved-empty">
           <strong>Nenhum post aprovado ainda.</strong>
@@ -307,4 +456,26 @@ function saveProjectSnapshot(
     CREATIVE_PROJECT_STORAGE_KEY,
     JSON.stringify(projectSnapshot),
   );
+}
+
+function countPostsByStatus(posts: ApprovedPost[]) {
+  return posts.reduce(
+    (counts, post) => ({
+      ...counts,
+      [post.status]: counts[post.status] + 1,
+    }),
+    {
+      approved: 0,
+      exported: 0,
+      ready_to_publish: 0,
+    } satisfies Record<ApprovedPostStatus, number>,
+  );
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
