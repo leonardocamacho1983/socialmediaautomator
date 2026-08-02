@@ -1432,6 +1432,133 @@ h2 {
   line-height: 1.45;
 }
 
+.visual-asset-card {
+  margin-top: 20px;
+}
+
+.asset-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.asset-section-heading h2 {
+  max-width: 18ch;
+}
+
+.asset-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 18px;
+  align-items: start;
+}
+
+.asset-prompt-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.asset-prompt-panel textarea {
+  min-height: 152px;
+}
+
+.asset-composite-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.asset-composite-image {
+  width: min(100%, 360px);
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid color-mix(in srgb, var(--foreground) 18%, transparent);
+  background: #ffffff;
+}
+
+.asset-selected-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.asset-composite-empty {
+  display: grid;
+  min-height: 420px;
+  place-content: center;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 34%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--border) 34%, transparent) 1px, transparent 1px),
+    var(--surface-muted);
+  background-size: 28px 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+.asset-composite-empty strong {
+  font-size: 1.05rem;
+}
+
+.asset-composite-empty p {
+  max-width: 32ch;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.asset-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.asset-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 12px;
+}
+
+.asset-card-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.asset-card img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.asset-card div {
+  display: grid;
+  gap: 2px;
+}
+
+.asset-card strong {
+  font-size: 0.9rem;
+}
+
+.asset-card span,
+.asset-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.asset-card p {
+  max-height: 7.1em;
+  overflow: auto;
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -1469,7 +1596,9 @@ h2 {
 
   .approved-detail-layout,
   .approved-detail-copy-grid,
-  .approved-detail-checklist {
+  .approved-detail-checklist,
+  .asset-workbench,
+  .asset-card-grid {
     grid-template-columns: 1fr;
   }
 

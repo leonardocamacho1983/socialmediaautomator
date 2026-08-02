@@ -17,9 +17,10 @@ This repository currently contains:
 - Marco 3.3 Approved Posts Library at `/approved`.
 - Marco 3.4 Approved Post Detail at `/approved/[postId]`.
 - Marco 3.5 Approved Posts Cockpit filters inside `/approved`.
+- Marco 4.0 Visual Asset Engine inside `/approved/[postId]`.
 
-The app still does not generate image assets, carousels, automations,
-analytics, or publications.
+The app still does not generate carousels, automations, analytics, durable
+asset storage, or publications.
 
 ## Local
 

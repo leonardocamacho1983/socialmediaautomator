@@ -11,15 +11,21 @@ import {
 } from "../../../lib/brand/profile";
 import {
   APPROVED_POSTS_STORAGE_KEY,
+  appendApprovedPostAssets,
   buildApprovedPostText,
   buildApprovedPostView,
   createDuplicateProjectFromApprovedPost,
   parseApprovedPosts,
+  selectApprovedPostAsset,
   updateApprovedPostNotes,
   updateApprovedPostStatus,
   type ApprovedPost,
   type ApprovedPostStatus,
 } from "../../../lib/creative/approved-posts";
+import {
+  buildDefaultAssetInstruction,
+  type GeneratedVisualAsset,
+} from "../../../lib/creative/assets";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import { downloadSvgAsPng, slugify } from "../../create/export-utils";
 
@@ -37,6 +43,8 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   const router = useRouter();
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const [posts, setPosts] = useState<ApprovedPost[]>([]);
+  const [assetPrompt, setAssetPrompt] = useState("");
+  const [isGeneratingAsset, setIsGeneratingAsset] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -51,6 +59,15 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   );
   const view = post ? buildApprovedPostView(post) : null;
   const finalChecklist = post?.projectSnapshot.finalPostPackage?.checklist || [];
+  const generatedAssets = post?.generatedAssets || [];
+  const suggestedAssetPrompt =
+    post && view
+      ? buildDefaultAssetInstruction(
+          post.projectSnapshot.briefing,
+          view.concept,
+          view.typographicPiece,
+        )
+      : "";
 
   function persistPosts(nextPosts: ApprovedPost[]) {
     setPosts(nextPosts);
@@ -114,9 +131,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     setStatus("Gerando PNG...");
 
     try {
+      const exportSvg = view.assetSvg || view.svg;
+      const assetSuffix = view.selectedAsset ? "-com-asset" : "";
       await downloadSvgAsPng(
-        view.svg,
-        `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}.png`,
+        exportSvg,
+        `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}${assetSuffix}.png`,
       );
       persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
       setStatus("PNG exportado.");
@@ -124,6 +143,76 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     } catch {
       setStatus("Nao foi possivel baixar o PNG.");
     }
+  }
+
+  async function generateAssets() {
+    if (!post || !view) {
+      setStatus("Post aprovado incompleto.");
+      return;
+    }
+
+    const prompt = assetPrompt.trim() || suggestedAssetPrompt;
+
+    if (!prompt.trim()) {
+      setStatus("Descreva a direcao visual antes de gerar.");
+      return;
+    }
+
+    setIsGeneratingAsset(true);
+    setStatus("Gerando asset visual...");
+
+    try {
+      const response = await fetch("/api/assets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          brandProfile: view.brand,
+          briefing: post.projectSnapshot.briefing,
+          selectedConcept: view.concept,
+          typographicPiece: view.typographicPiece,
+          userPrompt: prompt,
+          count: 1,
+        }),
+      });
+      const payload = (await response.json()) as {
+        assets?: GeneratedVisualAsset[];
+        error?: string;
+      };
+
+      if (!response.ok || !payload.assets?.length) {
+        throw new Error(
+          payload.error || "Nao foi possivel gerar asset visual.",
+        );
+      }
+
+      persistPosts(appendApprovedPostAssets(posts, post.id, payload.assets));
+      setStatus(
+        payload.assets.length === 1
+          ? "Asset gerado e selecionado."
+          : "Assets gerados. O primeiro foi selecionado.",
+      );
+      window.setTimeout(() => setStatus(""), 3200);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel gerar asset visual.",
+      );
+    } finally {
+      setIsGeneratingAsset(false);
+    }
+  }
+
+  function selectAsset(assetId: string | null) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(selectApprovedPostAsset(posts, post.id, assetId));
+    setStatus(assetId ? "Asset selecionado." : "Asset removido da composicao.");
+    window.setTimeout(() => setStatus(""), 2400);
   }
 
   if (!post) {
@@ -223,7 +312,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
               alt={`Preview aprovado de ${post.title}`}
               className="approved-detail-image"
               height={1350}
-              src={view.dataUrl}
+              src={view.assetDataUrl || view.dataUrl}
               width={1080}
             />
           ) : (
@@ -283,6 +372,127 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </dl>
           </section>
         </aside>
+      </section>
+
+      <section className="approved-detail-card visual-asset-card">
+        <div className="asset-section-heading">
+          <div>
+            <p className="section-kicker">Asset visual</p>
+            <h2>Gerar imagem para este post</h2>
+          </div>
+          {view?.selectedAsset ? (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => selectAsset(null)}
+            >
+              Voltar para tipografico
+            </button>
+          ) : null}
+        </div>
+
+        <div className="asset-workbench">
+          <div className="asset-prompt-panel">
+            <label className="field">
+              <span>Direcao visual antes de gerar</span>
+              <textarea
+                value={assetPrompt}
+                onChange={(event) => setAssetPrompt(event.target.value)}
+                placeholder={suggestedAssetPrompt || "Ex: metafora visual editorial, sem texto, sem logo, com espaco limpo para headline"}
+                rows={6}
+              />
+            </label>
+            <div className="approved-detail-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setAssetPrompt(suggestedAssetPrompt)}
+                disabled={!suggestedAssetPrompt || isGeneratingAsset}
+              >
+                Usar sugestao
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={generateAssets}
+                disabled={isGeneratingAsset || !view}
+              >
+                {isGeneratingAsset ? "Gerando..." : "Gerar assets"}
+              </button>
+            </div>
+            <p className="approved-detail-muted">
+              O asset nao deve trazer texto. A headline, a marca e o CTA sao
+              aplicados pelo renderizador do sistema.
+            </p>
+          </div>
+
+          <div className="asset-composite-panel">
+            {view?.assetDataUrl ? (
+              <>
+                <img
+                  alt={`Composicao com asset visual de ${post.title}`}
+                  className="asset-composite-image"
+                  height={1350}
+                  src={view.assetDataUrl}
+                  width={1080}
+                />
+                <span className="asset-selected-note">
+                  Asset selecionado: {view.selectedAsset?.model}
+                </span>
+              </>
+            ) : (
+              <div className="asset-composite-empty">
+                <strong>Sem asset selecionado</strong>
+                <p>
+                  Gere uma imagem e escolha uma opcao para ver a composicao
+                  final com texto por cima.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {generatedAssets.length ? (
+          <div className="asset-card-grid">
+            {generatedAssets.map((asset) => {
+              const selected = asset.id === post.selectedVisualAssetId;
+
+              return (
+                <article
+                  className={
+                    selected ? "asset-card asset-card-selected" : "asset-card"
+                  }
+                  key={asset.id}
+                >
+                  <img
+                    alt="Asset visual gerado"
+                    height={1350}
+                    src={asset.dataUrl}
+                    width={1080}
+                  />
+                  <div>
+                    <strong>{asset.model}</strong>
+                    <span>
+                      {new Date(asset.generatedAt).toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                  <p>{asset.prompt}</p>
+                  <button
+                    className={selected ? "primary-button" : "secondary-button"}
+                    type="button"
+                    onClick={() => selectAsset(asset.id)}
+                  >
+                    {selected ? "Selecionado" : "Usar este asset"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="approved-detail-muted">
+            Nenhum asset visual gerado para este post ainda.
+          </p>
+        )}
       </section>
 
       <section className="approved-detail-copy-grid">

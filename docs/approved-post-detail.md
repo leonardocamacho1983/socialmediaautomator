@@ -17,6 +17,9 @@ Included:
 - export selected image as PNG;
 - reopen the approved package in `/create`;
 - duplicate the package into a new editable project.
+- generate visual assets for the approved post through `/api/assets`;
+- select one generated asset;
+- preview and download a 1080x1350 composition with the selected asset.
 
 Not included:
 
@@ -25,7 +28,6 @@ Not included:
 - scheduling or publishing;
 - analytics;
 - comment or DM automation;
-- generated visual assets;
 - carousels.
 
 ## Local Storage Contract
@@ -39,6 +41,10 @@ socialmediaautomator.approvedPosts.v1
 
 Marco 3.4 adds `notes` to approved post records. Older records without `notes`
 are normalized to an empty string when read.
+
+Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Older records
+without asset fields are normalized to an empty asset list and no selected
+asset.
 
 This is still browser-local state. It is not a durable production content
 database.
