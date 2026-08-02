@@ -27,6 +27,13 @@ Included:
 - controlled copy variations so regenerating does not recreate identical slides;
 - persistent carousel generation index, preserved even after deleting a
   carousel;
+- deterministic visual grammars by slide role:
+  - cover texture with brand-framed typographic hierarchy;
+  - scene visual with chat bubbles;
+  - tension visual with timer and compression bars;
+  - mechanism visual with handoff/flow structure;
+  - proof visual with contrast between wrong and right patterns;
+  - close visual with CTA mark;
 - carousel approval state before export;
 - copy alerts for briefing language, weak patterns, and common Portuguese
   issues;
@@ -83,6 +90,11 @@ single-slide regeneration also advances the variation for that slide. Deleting a
 carousel does not reset `carouselGenerationIndex`, so deleting and generating
 again produces the next variation instead of recreating the same package.
 
+The visual layer is also deterministic. The renderer chooses visual grammar by
+slide role instead of asking a model to create final art. This keeps text,
+layout, colors, and visual symbols editable/predictable while making the
+carousel feel less like a plain typographic deck.
+
 ## Validation
 
 Run:
@@ -104,14 +116,18 @@ Manual validation:
 6. Click `Regenerar slide` on one slide and confirm only that slide changes.
 7. Click `Apagar carrossel`, generate again, and confirm the new carousel is
    not identical to the deleted one.
-8. Confirm the slide text does not include internal words like `metafora`,
+8. Confirm body slides have different visual grammar by role, not only text:
+   chat bubbles, timer/bars, flow, proof contrast, and final CTA mark.
+9. Confirm the visuals do not overlap with headline, body, footer, brand, or
+   slide count.
+10. Confirm the slide text does not include internal words like `metafora`,
    `virada`, `fecho`, or `mostrar que`.
-9. Confirm common Portuguese words are accented, for example `não`, `você`,
+11. Confirm common Portuguese words are accented, for example `não`, `você`,
    `está`, `também`, `negócio`, `robô`, `ninguém`, and `já`.
-10. Confirm the final slide uses a natural question, not a long awkward prompt.
-11. Confirm `Baixar ZIP do carrossel` is blocked before approval.
-12. Click `Aprovar carrossel`.
-13. Click `Baixar ZIP do carrossel`.
-14. Confirm the ZIP includes `slides/slide-01.png` through
+12. Confirm the final slide uses a natural question, not a long awkward prompt.
+13. Confirm `Baixar ZIP do carrossel` is blocked before approval.
+14. Click `Aprovar carrossel`.
+15. Click `Baixar ZIP do carrossel`.
+16. Confirm the ZIP includes `slides/slide-01.png` through
    `slides/slide-06.png`, copy files, `roteiro.txt`, and `metadata.json`.
-15. Click `Apagar carrossel` and confirm the empty state returns.
+17. Click `Apagar carrossel` and confirm the empty state returns.

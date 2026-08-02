@@ -115,7 +115,9 @@ export function carouselSlideToDataUrl(
   slide: CarouselSlide,
   brandProfile: BrandProfile,
 ) {
-  return svgToDataUrl(renderCarouselSlideSvg(carouselPackage, slide, brandProfile));
+  return svgToDataUrl(
+    renderCarouselSlideSvg(carouselPackage, slide, brandProfile),
+  );
 }
 
 export function updateCarouselSlideCopy(
@@ -182,7 +184,11 @@ export function evaluateCarouselSlideCopy(
   });
 }
 
-function buildSlides(input: CarouselGenerationInput, seed: number, variation: number) {
+function buildSlides(
+  input: CarouselGenerationInput,
+  seed: number,
+  variation: number,
+) {
   return buildPublicCarouselCopy(input, variation).map((slide, index) => ({
     id: `carousel-slide-${seed}-${index + 1}`,
     index: index + 1,
@@ -800,13 +806,20 @@ function renderCoverSlide(
   palette: Palette,
   font: FontFamilies,
 ) {
-  const headlineLines = wrapText(slide.headline, 15, 5);
+  const headlineLines = wrapText(slide.headline, 18, 6);
   const bodyLines = wrapText(slide.body, 38, 3);
   const headlineSize =
-    headlineLines.length >= 5 ? 62 : headlineLines.length >= 4 ? 70 : 82;
+    headlineLines.length >= 6
+      ? 58
+      : headlineLines.length >= 5
+        ? 62
+        : headlineLines.length >= 4
+          ? 70
+          : 82;
 
   return svgShell(`
     <rect width="1080" height="1350" fill="${palette.primary}" />
+    ${renderCoverTexture(palette)}
     <rect x="72" y="72" width="936" height="1206" fill="${palette.primary}" stroke="${palette.accent}" stroke-width="12" />
     <text x="116" y="142" ${font.body} font-size="28" font-weight="850" fill="${palette.light}">${escapeXml(slide.eyebrow)}</text>
     <text x="964" y="142" ${font.body} font-size="24" font-weight="800" fill="${palette.light}" text-anchor="end">${slide.index}/${carouselPackage.slides.length}</text>
@@ -843,7 +856,7 @@ function renderBodySlide(
   font: FontFamilies,
 ) {
   const headlineLines = wrapText(slide.headline, 18, 4);
-  const bodyLines = wrapText(slide.body, 35, 6);
+  const bodyLines = wrapText(slide.body, 28, 5);
   const headlineSize =
     headlineLines.length >= 4 ? 58 : headlineLines.length === 3 ? 66 : 76;
 
@@ -853,6 +866,7 @@ function renderBodySlide(
     <rect x="72" y="72" width="12" height="1206" fill="${palette.accent}" />
     <text x="124" y="142" ${font.body} font-size="24" font-weight="850" fill="${palette.primary}">${escapeXml(slide.eyebrow)}</text>
     <text x="956" y="142" ${font.body} font-size="24" font-weight="800" fill="${palette.muted}" text-anchor="end">${slide.index}/${carouselPackage.slides.length}</text>
+    ${renderRoleVisual(slide, palette)}
     ${renderTextLines({
       lines: headlineLines,
       x: 124,
@@ -867,7 +881,7 @@ function renderBodySlide(
     ${renderTextLines({
       lines: bodyLines,
       x: 124,
-      y: 792,
+      y: 820,
       size: 34,
       lineHeight: 46,
       weight: 650,
@@ -885,21 +899,24 @@ function renderCloseSlide(
   palette: Palette,
   font: FontFamilies,
 ) {
-  const headlineLines = wrapText(slide.headline, 16, 4);
+  const headlineLines = wrapText(slide.headline, 16, 5);
   const bodyLines = wrapText(slide.body, 34, 4);
+  const headlineSize =
+    headlineLines.length >= 5 ? 68 : headlineLines.length >= 4 ? 76 : 84;
 
   return svgShell(`
     <rect width="1080" height="1350" fill="${palette.background}" />
     <rect x="72" y="72" width="936" height="1206" fill="${palette.text}" />
+    ${renderCloseTexture(palette)}
     <rect x="112" y="112" width="856" height="1126" fill="${palette.text}" stroke="${palette.accent}" stroke-width="4" />
     <text x="140" y="174" ${font.body} font-size="27" font-weight="850" fill="${palette.light}">${escapeXml(slide.eyebrow || brandProfile.brandName)}</text>
     <text x="940" y="174" ${font.body} font-size="24" font-weight="800" fill="${palette.light}" text-anchor="end">${slide.index}/${carouselPackage.slides.length}</text>
     ${renderTextLines({
       lines: headlineLines,
       x: 140,
-      y: 458,
-      size: 80,
-      lineHeight: 90,
+      y: 420,
+      size: headlineSize,
+      lineHeight: headlineSize + 8,
       weight: 900,
       fill: palette.light,
       font: font.heading,
@@ -907,15 +924,136 @@ function renderCloseSlide(
     ${renderTextLines({
       lines: bodyLines,
       x: 140,
-      y: 878,
+      y: 846,
       size: 34,
       lineHeight: 46,
       weight: 700,
       fill: palette.light,
       font: font.body,
     })}
+    <rect x="140" y="1052" width="270" height="76" fill="${palette.accent}" rx="38" />
+    <circle cx="860" cy="1088" r="76" fill="${palette.accent}" opacity="0.96" />
+    <circle cx="860" cy="1088" r="28" fill="${palette.text}" />
     <text x="140" y="1168" ${font.body} font-size="28" font-weight="820" fill="${palette.accent}">${escapeXml(slide.footer)}</text>
   `);
+}
+
+function renderCoverTexture(palette: Palette) {
+  return `
+    <g opacity="0.18">
+      <rect x="636" y="182" width="248" height="104" fill="${palette.light}" rx="52" />
+      <rect x="702" y="316" width="206" height="78" fill="${palette.light}" rx="39" />
+      <rect x="604" y="430" width="292" height="78" fill="${palette.light}" rx="39" />
+      <circle cx="686" cy="234" r="10" fill="${palette.primary}" />
+      <circle cx="730" cy="234" r="10" fill="${palette.primary}" />
+      <circle cx="774" cy="234" r="10" fill="${palette.primary}" />
+    </g>
+    <g opacity="0.14">
+      ${Array.from({ length: 8 })
+        .map(
+          (_, index) =>
+            `<rect x="${118 + index * 108}" y="1260" width="56" height="8" fill="${palette.light}" />`,
+        )
+        .join("")}
+    </g>
+  `;
+}
+
+function renderCloseTexture(palette: Palette) {
+  return `
+    <g opacity="0.12">
+      <circle cx="832" cy="286" r="158" fill="${palette.accent}" />
+      <circle cx="848" cy="286" r="82" fill="${palette.text}" />
+      <rect x="674" y="990" width="240" height="98" fill="${palette.light}" rx="49" />
+      <rect x="624" y="1118" width="174" height="62" fill="${palette.light}" rx="31" />
+    </g>
+  `;
+}
+
+function renderRoleVisual(slide: CarouselSlide, palette: Palette) {
+  if (slide.role === "scene") {
+    return renderSceneVisual(palette);
+  }
+
+  if (slide.role === "tension") {
+    return renderTensionVisual(palette);
+  }
+
+  if (slide.role === "mechanism") {
+    return renderMechanismVisual(palette);
+  }
+
+  if (slide.role === "proof") {
+    return renderProofVisual(palette);
+  }
+
+  return "";
+}
+
+function renderSceneVisual(palette: Palette) {
+  return `
+    <g transform="translate(686 512) scale(0.76)">
+      <rect x="0" y="0" width="292" height="346" fill="${palette.primary}" opacity="0.08" rx="40" />
+      <rect x="38" y="34" width="216" height="278" fill="#ffffff" stroke="${palette.primary}" stroke-width="10" rx="38" />
+      <rect x="72" y="84" width="124" height="42" fill="${palette.primary}" opacity="0.88" rx="21" />
+      <rect x="96" y="154" width="128" height="42" fill="${palette.accent}" opacity="0.88" rx="21" />
+      <rect x="70" y="224" width="156" height="42" fill="${palette.primary}" opacity="0.88" rx="21" />
+      <circle cx="104" cy="105" r="7" fill="#ffffff" opacity="0.95" />
+      <circle cx="134" cy="105" r="7" fill="#ffffff" opacity="0.95" />
+      <circle cx="164" cy="105" r="7" fill="#ffffff" opacity="0.95" />
+      <path d="M62 288 C104 342 198 342 244 286" fill="none" stroke="${palette.accent}" stroke-width="12" stroke-linecap="round" />
+    </g>
+  `;
+}
+
+function renderTensionVisual(palette: Palette) {
+  return `
+    <g transform="translate(686 512) scale(0.76)">
+      <rect x="0" y="0" width="300" height="346" fill="${palette.primary}" opacity="0.08" rx="40" />
+      <circle cx="150" cy="128" r="92" fill="#ffffff" stroke="${palette.primary}" stroke-width="12" />
+      <path d="M150 128 L150 66" stroke="${palette.accent}" stroke-width="12" stroke-linecap="round" />
+      <path d="M150 128 L204 158" stroke="${palette.primary}" stroke-width="12" stroke-linecap="round" />
+      <rect x="118" y="16" width="64" height="24" fill="${palette.primary}" rx="12" />
+      <rect x="52" y="252" width="196" height="20" fill="${palette.primary}" opacity="0.86" rx="10" />
+      <rect x="52" y="292" width="132" height="20" fill="${palette.accent}" opacity="0.92" rx="10" />
+      <rect x="52" y="332" width="74" height="20" fill="${palette.primary}" opacity="0.44" rx="10" />
+    </g>
+  `;
+}
+
+function renderMechanismVisual(palette: Palette) {
+  return `
+    <g transform="translate(664 512) scale(0.76)">
+      <rect x="0" y="0" width="326" height="344" fill="${palette.primary}" opacity="0.08" rx="42" />
+      <rect x="46" y="42" width="216" height="72" fill="#ffffff" stroke="${palette.primary}" stroke-width="8" rx="36" />
+      <rect x="78" y="144" width="216" height="72" fill="${palette.primary}" opacity="0.92" rx="36" />
+      <rect x="46" y="246" width="216" height="72" fill="#ffffff" stroke="${palette.accent}" stroke-width="8" rx="36" />
+      <path d="M154 118 L154 140" stroke="${palette.accent}" stroke-width="10" stroke-linecap="round" />
+      <path d="M190 220 L190 242" stroke="${palette.accent}" stroke-width="10" stroke-linecap="round" />
+      <circle cx="92" cy="78" r="12" fill="${palette.primary}" opacity="0.9" />
+      <circle cx="130" cy="78" r="12" fill="${palette.primary}" opacity="0.9" />
+      <circle cx="126" cy="180" r="12" fill="#ffffff" opacity="0.96" />
+      <circle cx="164" cy="180" r="12" fill="#ffffff" opacity="0.96" />
+      <path d="M110 284 C138 252 174 252 202 284" fill="none" stroke="${palette.primary}" stroke-width="9" stroke-linecap="round" />
+      <circle cx="156" cy="282" r="20" fill="${palette.accent}" />
+    </g>
+  `;
+}
+
+function renderProofVisual(palette: Palette) {
+  return `
+    <g transform="translate(672 512) scale(0.76)">
+      <rect x="0" y="0" width="318" height="340" fill="${palette.primary}" opacity="0.08" rx="42" />
+      <rect x="36" y="48" width="246" height="94" fill="#ffffff" stroke="${palette.border}" stroke-width="3" rx="22" />
+      <rect x="36" y="198" width="246" height="94" fill="${palette.primary}" rx="22" />
+      <path d="M92 80 L128 116 M128 80 L92 116" stroke="${palette.accent}" stroke-width="12" stroke-linecap="round" />
+      <path d="M84 242 L110 266 L150 222" fill="none" stroke="${palette.accent}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+      <rect x="162" y="82" width="82" height="14" fill="${palette.muted}" opacity="0.36" rx="7" />
+      <rect x="162" y="110" width="54" height="14" fill="${palette.muted}" opacity="0.24" rx="7" />
+      <rect x="162" y="234" width="82" height="14" fill="#ffffff" opacity="0.74" rx="7" />
+      <rect x="162" y="262" width="54" height="14" fill="#ffffff" opacity="0.52" rx="7" />
+    </g>
+  `;
 }
 
 function svgShell(content: string) {
