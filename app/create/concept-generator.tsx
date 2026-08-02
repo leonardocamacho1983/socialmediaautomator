@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CaptionWorkshop } from "./caption-workshop";
+import { FinalPostPackageWorkshop } from "./final-post-package";
 import { TypographicPieceWorkshop } from "./typographic-piece-workshop";
 import {
   BRAND_PROFILE_STORAGE_KEY,
@@ -19,6 +20,7 @@ import {
   type CreativeBriefing,
   type CreativeConcept,
   type CreativeConceptBatch,
+  type FinalPostChecklistItem,
   type CreativeProject,
 } from "../../lib/creative/concepts";
 import {
@@ -51,6 +53,7 @@ function createProject(
     briefing,
     batch,
     selectedConceptId: null,
+    finalPostPackage: null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -134,6 +137,20 @@ export function ConceptGenerator() {
     project.captionPackage.conceptId === selectedConcept?.id &&
     project.captionPackage.typographicPieceId === activeTypographicPiece?.id
       ? project.captionPackage
+      : null;
+  const activeFinalPostPackage =
+    project?.finalPostPackage &&
+    selectedConcept &&
+    activeTypographicPiece &&
+    activeCaptionPackage &&
+    project.finalPostPackage.conceptId === selectedConcept.id &&
+    project.finalPostPackage.typographicPieceId === activeTypographicPiece.id &&
+    project.finalPostPackage.typographicVariantId ===
+      activeTypographicPiece.selectedVariantId &&
+    project.finalPostPackage.captionPackageId === activeCaptionPackage.id &&
+    project.finalPostPackage.captionVariantId ===
+      activeCaptionPackage.selectedVariantId
+      ? project.finalPostPackage
       : null;
 
   function persistProject(nextProject: CreativeProject) {
@@ -233,6 +250,7 @@ export function ConceptGenerator() {
         project.captionPackage.typographicPieceId === project.typographicPiece?.id
           ? project.captionPackage
           : null,
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -256,6 +274,7 @@ export function ConceptGenerator() {
       ...project,
       typographicPiece,
       captionPackage: null,
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -278,6 +297,7 @@ export function ConceptGenerator() {
         ...project.typographicPiece,
         selectedVariantId: variantId,
       },
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -299,6 +319,7 @@ export function ConceptGenerator() {
         },
       },
       captionPackage: null,
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -353,6 +374,7 @@ export function ConceptGenerator() {
       const nextProject: CreativeProject = {
         ...project,
         captionPackage: payload as CaptionPackage,
+        finalPostPackage: null,
         updatedAt: new Date().toISOString(),
       };
       persistProject(nextProject);
@@ -385,6 +407,7 @@ export function ConceptGenerator() {
         ...project.captionPackage,
         selectedVariantId: variantId,
       },
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -404,6 +427,7 @@ export function ConceptGenerator() {
       captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
         [field]: value,
       }),
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -420,6 +444,7 @@ export function ConceptGenerator() {
       captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
         hashtags: parseHashtags(value),
       }),
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
@@ -450,10 +475,34 @@ export function ConceptGenerator() {
       captionPackage: updateSelectedCaptionVariant(project.captionPackage, {
         review,
       }),
+      finalPostPackage: null,
       updatedAt: new Date().toISOString(),
     };
     persistProject(nextProject);
     setStatus("Legenda revisada contra criterios de Instagram.");
+  }
+
+  function approveFinalPostPackage(checklist: FinalPostChecklistItem[]) {
+    if (!project || !selectedConcept || !activeTypographicPiece || !activeCaptionPackage) {
+      return;
+    }
+
+    const nextProject: CreativeProject = {
+      ...project,
+      finalPostPackage: {
+        id: `final-post-${Date.now()}`,
+        conceptId: selectedConcept.id,
+        typographicPieceId: activeTypographicPiece.id,
+        typographicVariantId: activeTypographicPiece.selectedVariantId,
+        captionPackageId: activeCaptionPackage.id,
+        captionVariantId: activeCaptionPackage.selectedVariantId,
+        approvedAt: new Date().toISOString(),
+        checklist,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    persistProject(nextProject);
+    setStatus("Pacote final aprovado.");
   }
 
   return (
@@ -611,15 +660,19 @@ export function ConceptGenerator() {
             {selectedConcept ? (
               <>
                 <h3>
-                  {activeCaptionPackage
-                    ? "Legenda em revisao"
+                  {activeFinalPostPackage
+                    ? "Post final aprovado"
+                    : activeCaptionPackage
+                      ? "Pronto para pacote final"
                     : activeTypographicPiece
                       ? "Pronto para legenda"
                       : "Pronto para Marco 3"}
                 </h3>
                 <p>
-                  {activeCaptionPackage
-                    ? "Agora edite a legenda, primeiro comentario e hashtags. A revisao ajuda a reduzir repeticao, promessa exagerada e cara de IA."
+                  {activeFinalPostPackage
+                    ? "O pacote final foi aprovado com imagem, legenda, primeiro comentario, hashtags e checklist."
+                    : activeCaptionPackage
+                      ? "Revise o pacote final do post antes de considerar esta peca pronta para uso."
                     : activeTypographicPiece
                       ? "A peca tipografica esta pronta. Gere a legenda sabendo o que o visual ja diz."
                       : "Produzir a primeira peca tipografica a partir deste conceito: copy visual, layout 1080x1350 e tres variacoes."}
@@ -637,33 +690,38 @@ export function ConceptGenerator() {
                     <dt>Saida</dt>
                     <dd>
                       {activeCaptionPackage
-                        ? "Legenda + primeiro comentario"
+                        ? "Pacote final do post"
                         : activeTypographicPiece
                           ? "3 opcoes de legenda"
                           : "Preview + PNG final"}
                     </dd>
                   </div>
                 </dl>
-                <button
-                  className="primary-button next-step-button"
-                  type="button"
-                  disabled={Boolean(activeTypographicPiece && isGeneratingCaption)}
-                  onClick={
-                    activeTypographicPiece
-                      ? generateCaptionPackage
-                      : produceTypographicPiece
-                  }
-                >
-                  {activeCaptionPackage
-                    ? isGeneratingCaption
-                      ? "Gerando..."
-                      : "Regenerar legendas"
-                    : activeTypographicPiece
+                {activeCaptionPackage ? (
+                  <a
+                    className="primary-button next-step-button"
+                    href="#final-post-package"
+                  >
+                    Ver pacote final
+                  </a>
+                ) : (
+                  <button
+                    className="primary-button next-step-button"
+                    type="button"
+                    disabled={Boolean(activeTypographicPiece && isGeneratingCaption)}
+                    onClick={
+                      activeTypographicPiece
+                        ? generateCaptionPackage
+                        : produceTypographicPiece
+                    }
+                  >
+                    {activeTypographicPiece
                       ? isGeneratingCaption
                         ? "Gerando..."
                         : "Gerar legenda"
                       : "Produzir peca tipografica"}
-                </button>
+                  </button>
+                )}
                 {activeTypographicPiece ? (
                   <a className="secondary-button next-step-button" href="#typographic-piece">
                     Ver peca tipografica
@@ -695,6 +753,12 @@ export function ConceptGenerator() {
                           id: activeCaptionPackage.id,
                           selectedVariantId:
                             activeCaptionPackage.selectedVariantId,
+                        }
+                      : null,
+                    finalPostPackage: activeFinalPostPackage
+                      ? {
+                          id: activeFinalPostPackage.id,
+                          approvedAt: activeFinalPostPackage.approvedAt,
                         }
                       : null,
                     decisionTrace: project.batch.decisionTrace,
@@ -810,6 +874,17 @@ export function ConceptGenerator() {
           onUpdateCaptionHashtags={updateCaptionHashtags}
           onUpdateCaptionVariant={updateCaptionVariant}
           onUpdateRegenerationInstruction={setCaptionRegenerationInstruction}
+        />
+      ) : null}
+
+      {project && selectedConcept && activeTypographicPiece && activeCaptionPackage ? (
+        <FinalPostPackageWorkshop
+          brandProfile={activeBrandProfile}
+          captionPackage={activeCaptionPackage}
+          finalPostPackage={activeFinalPostPackage}
+          selectedConcept={selectedConcept}
+          typographicPiece={activeTypographicPiece}
+          onApprove={approveFinalPostPackage}
         />
       ) : null}
     </main>

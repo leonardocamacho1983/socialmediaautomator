@@ -62,6 +62,24 @@ export type CreativeConceptBatch = {
   generatedAt: string;
 };
 
+export type FinalPostChecklistItem = {
+  id: string;
+  label: string;
+  status: "ok" | "review";
+  note: string;
+};
+
+export type FinalPostPackage = {
+  id: string;
+  conceptId: string;
+  typographicPieceId: string;
+  typographicVariantId: string;
+  captionPackageId: string;
+  captionVariantId: string;
+  approvedAt: string;
+  checklist: FinalPostChecklistItem[];
+};
+
 export type CreativeProject = {
   id: string;
   brandSnapshot: BrandProfile;
@@ -70,6 +88,7 @@ export type CreativeProject = {
   selectedConceptId: string | null;
   typographicPiece?: TypographicPiece | null;
   captionPackage?: CaptionPackage | null;
+  finalPostPackage?: FinalPostPackage | null;
   updatedAt: string;
 };
 

@@ -2,7 +2,8 @@ const checks = [
   "Marco 0 em producao",
   "Marco 1 com perfil de marca local",
   "Marco 2 com gerador de conceitos",
-  "Sem arte final, publicacao ou automacao neste momento",
+  "Marco 3.2 com pacote final de post tipografico",
+  "Sem imagens geradas, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];
 
@@ -14,7 +15,8 @@ export default function Home() {
         <h1 id="reset-title">Base limpa.</h1>
         <p className="lead">
           O reset foi concluido. Agora o sistema estrutura a marca e gera
-          conceitos criativos antes de criar qualquer asset.
+          conceitos, peca tipografica, legenda e pacote final antes de qualquer
+          automacao.
         </p>
         <ul className="check-list" aria-label="Status do reset">
           {checks.map((check) => (
