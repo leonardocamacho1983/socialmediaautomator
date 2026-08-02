@@ -1464,6 +1464,23 @@ h2 {
   min-height: 152px;
 }
 
+.asset-status {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, #ffffff);
+  color: var(--accent-strong);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.asset-status-error {
+  border-color: color-mix(in srgb, var(--accent-warm) 42%, transparent);
+  background: color-mix(in srgb, var(--accent-warm) 8%, #ffffff);
+  color: #7a2415;
+}
+
 .asset-composite-panel {
   display: grid;
   gap: 10px;

@@ -139,17 +139,6 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
-    return Response.json(
-      {
-        code: "AI_GATEWAY_AUTH_MISSING",
-        error:
-          "AI Gateway nao esta configurado neste ambiente. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
-      },
-      { status: 503 },
-    );
-  }
-
   const contentLength = Number(request.headers.get("content-length") || "0");
 
   if (contentLength > MAX_REQUEST_BODY_CHARS) {

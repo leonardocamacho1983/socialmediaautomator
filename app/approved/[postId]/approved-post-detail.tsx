@@ -44,6 +44,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const [posts, setPosts] = useState<ApprovedPost[]>([]);
   const [assetPrompt, setAssetPrompt] = useState("");
+  const [assetStatus, setAssetStatus] = useState("");
   const [isGeneratingAsset, setIsGeneratingAsset] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -154,11 +155,12 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     const prompt = assetPrompt.trim() || suggestedAssetPrompt;
 
     if (!prompt.trim()) {
-      setStatus("Descreva a direcao visual antes de gerar.");
+      setAssetStatus("Descreva a direcao visual antes de gerar.");
       return;
     }
 
     setIsGeneratingAsset(true);
+    setAssetStatus("Gerando asset visual...");
     setStatus("Gerando asset visual...");
 
     try {
@@ -188,6 +190,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       }
 
       persistPosts(appendApprovedPostAssets(posts, post.id, payload.assets));
+      setAssetStatus(
+        payload.assets.length === 1
+          ? "Asset gerado e selecionado."
+          : "Assets gerados. O primeiro foi selecionado.",
+      );
       setStatus(
         payload.assets.length === 1
           ? "Asset gerado e selecionado."
@@ -195,11 +202,12 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       );
       window.setTimeout(() => setStatus(""), 3200);
     } catch (error) {
-      setStatus(
+      const message =
         error instanceof Error
           ? error.message
-          : "Nao foi possivel gerar asset visual.",
-      );
+          : "Nao foi possivel gerar asset visual.";
+      setAssetStatus(message);
+      setStatus(message);
     } finally {
       setIsGeneratingAsset(false);
     }
@@ -211,6 +219,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     }
 
     persistPosts(selectApprovedPostAsset(posts, post.id, assetId));
+    setAssetStatus(
+      assetId ? "Asset selecionado." : "Asset removido da composicao.",
+    );
     setStatus(assetId ? "Asset selecionado." : "Asset removido da composicao.");
     window.setTimeout(() => setStatus(""), 2400);
   }
@@ -420,6 +431,22 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                 {isGeneratingAsset ? "Gerando..." : "Gerar assets"}
               </button>
             </div>
+            {assetStatus ? (
+              <p
+                className={
+                  assetStatus.includes("Nao") ||
+                  assetStatus.includes("erro") ||
+                  assetStatus.includes("recusou") ||
+                  assetStatus.includes("limite") ||
+                  assetStatus.includes("configurado")
+                    ? "asset-status asset-status-error"
+                    : "asset-status"
+                }
+                role="status"
+              >
+                {assetStatus}
+              </p>
+            ) : null}
             <p className="approved-detail-muted">
               O asset nao deve trazer texto. A headline, a marca e o CTA sao
               aplicados pelo renderizador do sistema.
