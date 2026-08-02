@@ -1,11 +1,13 @@
-# Marco 4.0 Visual Asset Engine
+# Marco 4.1 Visual Asset Review
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 4.0 adds a minimal visual asset step after a final post package has been
-approved.
+Marco 4.1 extends the visual asset step after a final post package has been
+approved. The goal is no longer only generating one image: the approved post
+detail now supports reviewing, rejecting, regenerating, composing, and approving
+the visual version of the post.
 
 Included:
 
@@ -20,18 +22,29 @@ Included:
 - one generated asset per request, with repeated requests accumulating options;
 - generated asset options stored in the local approved post record;
 - selected asset attached to the approved post;
-- 1080x1350 image-led composition with headline, support copy, CTA, and brand;
-- PNG download of the selected asset composition.
+- three 1080x1350 image-led composition variants;
+- PNG download of the selected asset composition;
+- quick regeneration instructions before calling the image model again;
+- rejection reasons for generated assets;
+- automatic regeneration prompt from the rejection reason;
+- final visual approval status;
+- visual status shown in `/approved`.
 
 The model prompt explicitly asks for visual-only output. Text, letters, logos,
 captions, watermarks, and UI labels must stay out of the generated image because
 the app renders copy and brand elements itself.
 
 The image-led renderer uses its own composition rules. It keeps the generated
-asset as the visual subject, places the copy in a single lower text panel, and
-keeps brand name, headline, support copy, and CTA inside that same hierarchy.
-The renderer should not duplicate the brand name in the footer or leave support
-copy and CTA floating over the image.
+asset as the visual subject and applies brand name, headline, support copy, and
+CTA through the system renderer. The current composition families are:
+
+- `lower-panel`: dark lower panel with strong readability;
+- `editorial-split`: vertical editorial panel beside the visual subject;
+- `clean-band`: light reading band over a dominant image.
+
+The renderer should not duplicate the brand name in the footer, leave support
+copy and CTA floating over the image, or depend on text generated inside the
+asset.
 
 ## Not Included
 
@@ -68,7 +81,7 @@ available.
 
 ## Local Storage Contract
 
-Marco 4.0 extends approved post records in:
+Marco 4.1 extends approved post records in:
 
 ```text
 socialmediaautomator.approvedPosts.v1
@@ -79,6 +92,10 @@ New fields:
 ```ts
 generatedAssets: GeneratedVisualAsset[]
 selectedVisualAssetId: string | null
+selectedAssetCompositionId: AssetCompositionVariantId
+visualStatus: ApprovedPostVisualStatus
+visualApprovedAt: string | null
+visualAssetRejections: VisualAssetRejection[]
 ```
 
 The assets are currently stored as data URLs in browser localStorage and capped
@@ -104,5 +121,10 @@ Manual validation:
 4. Write or use the suggested asset direction.
 5. Click `Gerar assets`.
 6. Select one generated asset.
-7. Confirm the main preview changes to the composed image-led post.
-8. Download the PNG and confirm it is 1080x1350.
+7. Test the three composition options.
+8. Reject one asset with a reason and confirm the regeneration instruction is
+   prepared.
+9. Generate another asset if needed.
+10. Approve the final visual version.
+11. Confirm `/approved` shows the visual status.
+12. Download the PNG and confirm it is 1080x1350.

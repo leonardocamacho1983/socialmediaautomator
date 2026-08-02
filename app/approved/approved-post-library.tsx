@@ -19,6 +19,7 @@ import {
   updateApprovedPostStatus,
   type ApprovedPost,
   type ApprovedPostStatus,
+  type ApprovedPostVisualStatus,
 } from "../../lib/creative/approved-posts";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../lib/creative/concepts";
 import { downloadSvgAsPng, slugify } from "../create/export-utils";
@@ -27,6 +28,13 @@ const statusLabels: Record<ApprovedPostStatus, string> = {
   approved: "Aprovado",
   exported: "Exportado",
   ready_to_publish: "Pronto para publicar",
+};
+
+const visualStatusLabels: Record<ApprovedPostVisualStatus, string> = {
+  typographic_only: "So tipografico",
+  asset_generated: "Com asset gerado",
+  asset_rejected: "Asset rejeitado",
+  visual_approved: "Visual aprovado",
 };
 
 type ApprovedPostFilter = ApprovedPostStatus | "all";
@@ -58,6 +66,10 @@ export function ApprovedPostLibrary() {
     [posts],
   );
   const statusCounts = useMemo(() => countPostsByStatus(posts), [posts]);
+  const visualStatusCounts = useMemo(
+    () => countPostsByVisualStatus(posts),
+    [posts],
+  );
   const normalizedSearchTerm = normalizeSearchText(searchTerm);
   const visiblePosts = useMemo(
     () =>
@@ -128,9 +140,11 @@ export function ApprovedPostLibrary() {
     setStatus("Gerando PNG...");
 
     try {
+      const exportSvg = view.assetSvg || view.svg;
+      const assetSuffix = view.selectedAsset ? "-com-asset" : "";
       await downloadSvgAsPng(
-        view.svg,
-        `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}.png`,
+        exportSvg,
+        `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}${assetSuffix}.png`,
       );
       updateStatus(post.id, "exported");
       setStatus("PNG exportado.");
@@ -155,11 +169,12 @@ export function ApprovedPostLibrary() {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 3.5</p>
+          <p className="eyebrow">Marco 4.1</p>
           <h1>Posts aprovados</h1>
           <p className="lead">
-            Cockpit local dos pacotes finais aprovados. Ainda sem Zernio,
-            calendario, publicacao, banco de dados ou automacao.
+            Cockpit local dos pacotes finais aprovados, agora com status visual
+            dos assets. Ainda sem Zernio, calendario, publicacao, banco de
+            dados ou automacao.
           </p>
         </div>
       </header>
@@ -232,6 +247,28 @@ export function ApprovedPostLibrary() {
         </button>
       </section>
 
+      <section
+        className="approved-visual-cockpit"
+        aria-label="Resumo visual dos aprovados"
+      >
+        <div className="approved-visual-metric">
+          <span>{visualStatusLabels.typographic_only}</span>
+          <strong>{visualStatusCounts.typographic_only}</strong>
+        </div>
+        <div className="approved-visual-metric">
+          <span>{visualStatusLabels.asset_generated}</span>
+          <strong>{visualStatusCounts.asset_generated}</strong>
+        </div>
+        <div className="approved-visual-metric">
+          <span>{visualStatusLabels.asset_rejected}</span>
+          <strong>{visualStatusCounts.asset_rejected}</strong>
+        </div>
+        <div className="approved-visual-metric">
+          <span>{visualStatusLabels.visual_approved}</span>
+          <strong>{visualStatusCounts.visual_approved}</strong>
+        </div>
+      </section>
+
       <section className="approved-filter-panel" aria-label="Filtros">
         <label className="field approved-search-field">
           <span>Busca</span>
@@ -291,7 +328,7 @@ export function ApprovedPostLibrary() {
                     alt={`Preview aprovado de ${post.title}`}
                     className="approved-post-image"
                     height={1350}
-                    src={view.dataUrl}
+                    src={view.assetDataUrl || view.dataUrl}
                     width={1080}
                   />
                 ) : (
@@ -306,6 +343,11 @@ export function ApprovedPostLibrary() {
                       className={`approved-status approved-status-${post.status}`}
                     >
                       {statusLabels[post.status]}
+                    </span>
+                    <span
+                      className={`visual-status visual-status-${post.visualStatus}`}
+                    >
+                      {visualStatusLabels[post.visualStatus]}
                     </span>
                     <strong>{post.title}</strong>
                     <small>
@@ -469,6 +511,21 @@ function countPostsByStatus(posts: ApprovedPost[]) {
       exported: 0,
       ready_to_publish: 0,
     } satisfies Record<ApprovedPostStatus, number>,
+  );
+}
+
+function countPostsByVisualStatus(posts: ApprovedPost[]) {
+  return posts.reduce(
+    (counts, post) => ({
+      ...counts,
+      [post.visualStatus]: counts[post.visualStatus] + 1,
+    }),
+    {
+      typographic_only: 0,
+      asset_generated: 0,
+      asset_rejected: 0,
+      visual_approved: 0,
+    } satisfies Record<ApprovedPostVisualStatus, number>,
   );
 }
 

@@ -9,6 +9,7 @@ const checks = [
   "Marco 3.4 com detalhe individual do post aprovado",
   "Marco 3.5 com cockpit, filtros e busca dos aprovados",
   "Marco 4.0 com geracao minima de assets visuais",
+  "Marco 4.1 com variacoes, rejeicao e aprovacao visual",
   "Sem carrossel, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];
@@ -22,7 +23,7 @@ export default function Home() {
         <p className="lead">
           O reset foi concluido. Agora o sistema estrutura a marca e gera
           conceitos, peca tipografica, legenda, pacote final e assets visuais
-          antes de qualquer automacao.
+          com revisao visual antes de qualquer automacao.
         </p>
         <ul className="check-list" aria-label="Status do reset">
           {checks.map((check) => (

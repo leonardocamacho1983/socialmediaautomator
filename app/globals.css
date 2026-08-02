@@ -146,6 +146,12 @@ h1 {
   color: var(--foreground);
 }
 
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 .primary-link:focus-visible,
 .health-link:focus-visible,
 .primary-button:focus-visible,
@@ -1105,6 +1111,13 @@ h2 {
   margin-bottom: 16px;
 }
 
+.approved-visual-cockpit {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 .approved-metric {
   display: grid;
   gap: 10px;
@@ -1143,6 +1156,27 @@ h2 {
   color: var(--accent-strong);
   font-size: clamp(2rem, 4vw, 3rem);
   line-height: 0.9;
+}
+
+.approved-visual-metric {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-muted) 78%, #ffffff);
+  padding: 13px;
+}
+
+.approved-visual-metric span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 840;
+  text-transform: uppercase;
+}
+
+.approved-visual-metric strong {
+  color: var(--accent-strong);
+  font-size: 1.7rem;
+  line-height: 1;
 }
 
 .approved-filter-panel {
@@ -1248,6 +1282,36 @@ h2 {
 }
 
 .approved-status-ready_to_publish {
+  background: #101514;
+  color: #eaf3ee;
+}
+
+.visual-status {
+  width: fit-content;
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.visual-status-typographic_only {
+  background: #ffffff;
+  color: var(--muted);
+}
+
+.visual-status-asset_generated {
+  background: color-mix(in srgb, var(--accent) 9%, #ffffff);
+  color: var(--accent-strong);
+}
+
+.visual-status-asset_rejected {
+  background: color-mix(in srgb, var(--accent-warm) 10%, #ffffff);
+  color: #7a2415;
+}
+
+.visual-status-visual_approved {
   background: #101514;
   color: #eaf3ee;
 }
@@ -1448,6 +1512,13 @@ h2 {
   max-width: 18ch;
 }
 
+.asset-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .asset-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
@@ -1462,6 +1533,12 @@ h2 {
 
 .asset-prompt-panel textarea {
   min-height: 152px;
+}
+
+.asset-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .asset-status {
@@ -1526,6 +1603,50 @@ h2 {
   line-height: 1.45;
 }
 
+.asset-composition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.asset-composition-card {
+  display: grid;
+  gap: 8px;
+  min-height: 118px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 13px;
+  text-align: left;
+}
+
+.asset-composition-card:hover,
+.asset-composition-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.asset-composition-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.asset-composition-card-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.asset-composition-card strong {
+  color: var(--accent-strong);
+  font-size: 0.94rem;
+}
+
+.asset-composition-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .asset-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1576,6 +1697,29 @@ h2 {
   overflow: auto;
 }
 
+.asset-rejection-note {
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--accent-warm) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent-warm) 8%, #ffffff);
+  padding: 6px 8px;
+  color: #7a2415;
+  font-weight: 760;
+}
+
+.asset-rejection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.asset-rejection-actions strong {
+  flex: 1 0 100%;
+  color: var(--foreground);
+  font-size: 0.84rem;
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -1624,6 +1768,8 @@ h2 {
   }
 
   .approved-cockpit,
+  .approved-visual-cockpit,
+  .asset-composition-grid,
   .approved-filter-panel {
     grid-template-columns: 1fr;
   }

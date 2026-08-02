@@ -12,16 +12,24 @@ import {
 import {
   APPROVED_POSTS_STORAGE_KEY,
   appendApprovedPostAssets,
+  approveApprovedPostVisual,
   buildApprovedPostText,
   buildApprovedPostView,
   createDuplicateProjectFromApprovedPost,
+  getVisualAssetRejectionReason,
   parseApprovedPosts,
+  rejectApprovedPostAsset,
   selectApprovedPostAsset,
+  selectApprovedPostAssetComposition,
   updateApprovedPostNotes,
   updateApprovedPostStatus,
+  visualAssetRejectionReasons,
   type ApprovedPost,
   type ApprovedPostStatus,
+  type ApprovedPostVisualStatus,
+  type VisualAssetRejectionReasonId,
 } from "../../../lib/creative/approved-posts";
+import type { AssetCompositionVariantId } from "../../../lib/creative/asset-composition";
 import {
   buildDefaultAssetInstruction,
   type GeneratedVisualAsset,
@@ -38,6 +46,31 @@ const statusLabels: Record<ApprovedPostStatus, string> = {
   exported: "Exportado",
   ready_to_publish: "Pronto para publicar",
 };
+
+const visualStatusLabels: Record<ApprovedPostVisualStatus, string> = {
+  typographic_only: "So tipografico",
+  asset_generated: "Com asset gerado",
+  asset_rejected: "Asset rejeitado",
+  visual_approved: "Visual aprovado",
+};
+
+const assetPromptPresets = [
+  {
+    label: "Sem texto",
+    prompt:
+      "Remover qualquer texto, numero, contador, badge ou interface legivel. Manter apenas formas abstratas.",
+  },
+  {
+    label: "Mais premium",
+    prompt:
+      "Deixar mais premium, editorial e menos cartunesco. Usar menos elementos e mais respiro.",
+  },
+  {
+    label: "Metafora simples",
+    prompt:
+      "Fazer uma metafora mais simples e imediatamente compreensivel, sem depender de detalhe pequeno.",
+  },
+];
 
 export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   const router = useRouter();
@@ -181,11 +214,14 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       const payload = (await response.json()) as {
         assets?: GeneratedVisualAsset[];
         error?: string;
+        details?: string;
       };
 
       if (!response.ok || !payload.assets?.length) {
         throw new Error(
-          payload.error || "Nao foi possivel gerar asset visual.",
+          payload.details
+            ? `${payload.error || "Nao foi possivel gerar asset visual."} (${payload.details})`
+            : payload.error || "Nao foi possivel gerar asset visual.",
         );
       }
 
@@ -226,6 +262,49 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     window.setTimeout(() => setStatus(""), 2400);
   }
 
+  function selectComposition(compositionId: AssetCompositionVariantId) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(
+      selectApprovedPostAssetComposition(posts, post.id, compositionId),
+    );
+    setAssetStatus("Composicao atualizada.");
+    setStatus("Composicao atualizada.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
+  function rejectAsset(
+    assetId: string,
+    reasonId: VisualAssetRejectionReasonId,
+  ) {
+    if (!post) {
+      return;
+    }
+
+    const reason = getVisualAssetRejectionReason(reasonId);
+    persistPosts(rejectApprovedPostAsset(posts, post.id, assetId, reasonId));
+    setAssetPrompt(reason.regenerationInstruction);
+    setAssetStatus(
+      `Asset rejeitado: ${reason.label}. A instrucao de regeneracao foi preparada.`,
+    );
+    setStatus("Asset rejeitado.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
+  function approveVisualFinal() {
+    if (!post || !view?.selectedAsset) {
+      setAssetStatus("Selecione um asset antes de aprovar o visual final.");
+      return;
+    }
+
+    persistPosts(approveApprovedPostVisual(posts, post.id));
+    setAssetStatus("Visual final aprovado. Post marcado como pronto.");
+    setStatus("Visual final aprovado.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
   if (!post) {
     return (
       <main className="brand-shell approved-detail-shell">
@@ -242,7 +321,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </Link>
           </div>
           <div>
-            <p className="eyebrow">Marco 3.4</p>
+            <p className="eyebrow">Marco 4.1</p>
             <h1>Post nao encontrado</h1>
             <p className="lead">
               Este post nao existe na biblioteca local deste navegador.
@@ -279,10 +358,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 3.4</p>
+          <p className="eyebrow">Marco 4.1</p>
           <h1>{post.title}</h1>
           <p className="lead">
-            Revisao individual do post aprovado. Ainda sem publicacao, Zernio,
+            Revisao individual do post aprovado, com escolha de asset,
+            composicao visual e aprovacao final. Ainda sem publicacao, Zernio,
             banco de dados ou automacao.
           </p>
         </div>
@@ -291,6 +371,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       <section className="approved-detail-toolbar" aria-label="Acoes do post">
         <span className={`approved-status approved-status-${post.status}`}>
           {statusLabels[post.status]}
+        </span>
+        <span className={`visual-status visual-status-${post.visualStatus}`}>
+          {visualStatusLabels[post.visualStatus]}
         </span>
         <button className="primary-button" type="button" onClick={openPost}>
           Editar no fluxo
@@ -378,6 +461,16 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                     <dt>Legenda</dt>
                     <dd>{view.captionVariant.label}</dd>
                   </div>
+                  <div>
+                    <dt>Status visual</dt>
+                    <dd>{visualStatusLabels[post.visualStatus]}</dd>
+                  </div>
+                  {view.selectedAsset ? (
+                    <div>
+                      <dt>Composicao</dt>
+                      <dd>{view.selectedAssetCompositionVariant.name}</dd>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </dl>
@@ -392,13 +485,25 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             <h2>Gerar imagem para este post</h2>
           </div>
           {view?.selectedAsset ? (
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => selectAsset(null)}
-            >
-              Voltar para tipografico
-            </button>
+            <div className="asset-header-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={approveVisualFinal}
+                disabled={post.visualStatus === "visual_approved"}
+              >
+                {post.visualStatus === "visual_approved"
+                  ? "Visual aprovado"
+                  : "Aprovar visual final"}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => selectAsset(null)}
+              >
+                Voltar para tipografico
+              </button>
+            </div>
           ) : null}
         </div>
 
@@ -413,6 +518,19 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                 rows={6}
               />
             </label>
+            <div className="asset-preset-row" aria-label="Ajustes rapidos">
+              {assetPromptPresets.map((preset) => (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  key={preset.label}
+                  onClick={() => setAssetPrompt(preset.prompt)}
+                  disabled={isGeneratingAsset}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
             <div className="approved-detail-actions">
               <button
                 className="secondary-button"
@@ -428,7 +546,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                 onClick={generateAssets}
                 disabled={isGeneratingAsset || !view}
               >
-                {isGeneratingAsset ? "Gerando..." : "Gerar assets"}
+                {isGeneratingAsset
+                  ? "Gerando..."
+                  : view?.selectedAsset
+                    ? "Regenerar asset"
+                    : "Gerar asset"}
               </button>
             </div>
             {assetStatus ? (
@@ -464,7 +586,8 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                   width={1080}
                 />
                 <span className="asset-selected-note">
-                  Asset selecionado: {view.selectedAsset?.model}
+                  Asset selecionado: {view.selectedAsset?.model} |{" "}
+                  {view.selectedAssetCompositionVariant.name}
                 </span>
               </>
             ) : (
@@ -479,10 +602,41 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </div>
         </div>
 
+        {view?.selectedAsset ? (
+          <div className="asset-composition-grid">
+            {view.assetCompositionVariants.map((composition) => {
+              const selected =
+                composition.id === post.selectedAssetCompositionId;
+
+              return (
+                <button
+                  className={
+                    selected
+                      ? "asset-composition-card asset-composition-card-selected"
+                      : "asset-composition-card"
+                  }
+                  type="button"
+                  key={composition.id}
+                  onClick={() => selectComposition(composition.id)}
+                >
+                  <strong>{composition.name}</strong>
+                  <span>{composition.layoutFamily}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {generatedAssets.length ? (
           <div className="asset-card-grid">
             {generatedAssets.map((asset) => {
               const selected = asset.id === post.selectedVisualAssetId;
+              const rejection = post.visualAssetRejections.find(
+                (item) => item.assetId === asset.id,
+              );
+              const rejectionReason = rejection
+                ? getVisualAssetRejectionReason(rejection.reasonId)
+                : null;
 
               return (
                 <article
@@ -504,13 +658,34 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                     </span>
                   </div>
                   <p>{asset.prompt}</p>
+                  {rejectionReason ? (
+                    <span className="asset-rejection-note">
+                      Rejeitado: {rejectionReason.label}
+                    </span>
+                  ) : null}
                   <button
                     className={selected ? "primary-button" : "secondary-button"}
                     type="button"
+                    disabled={Boolean(rejection)}
                     onClick={() => selectAsset(asset.id)}
                   >
                     {selected ? "Selecionado" : "Usar este asset"}
                   </button>
+                  {selected && !rejection ? (
+                    <div className="asset-rejection-actions">
+                      <strong>Rejeitar asset</strong>
+                      {visualAssetRejectionReasons.map((reason) => (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          key={reason.id}
+                          onClick={() => rejectAsset(asset.id, reason.id)}
+                        >
+                          {reason.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </article>
               );
             })}

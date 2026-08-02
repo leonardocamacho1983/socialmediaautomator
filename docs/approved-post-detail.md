@@ -1,10 +1,11 @@
-# Marco 3.4 Approved Post Detail
+# Marco 4.1 Approved Post Detail
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 3.4 adds an individual review page for each locally approved post.
+Marco 4.1 keeps the individual review page for each locally approved post and
+adds final visual review controls.
 
 Included:
 
@@ -19,7 +20,11 @@ Included:
 - duplicate the package into a new editable project.
 - generate visual assets for the approved post through `/api/assets`;
 - select one generated asset;
-- preview and download a 1080x1350 composition with the selected asset.
+- preview and download a 1080x1350 composition with the selected asset;
+- choose between image-led composition variants;
+- reject weak assets with a reason;
+- prepare regeneration instructions from the rejection reason;
+- approve the final visual version.
 
 Not included:
 
@@ -42,9 +47,11 @@ socialmediaautomator.approvedPosts.v1
 Marco 3.4 adds `notes` to approved post records. Older records without `notes`
 are normalized to an empty string when read.
 
-Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Older records
-without asset fields are normalized to an empty asset list and no selected
-asset.
+Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Marco 4.1 adds
+`selectedAssetCompositionId`, `visualStatus`, `visualApprovedAt`, and
+`visualAssetRejections`. Older records without asset fields are normalized to an
+empty asset list, no selected asset, the default composition, and
+typographic-only visual status.
 
 This is still browser-local state. It is not a durable production content
 database.

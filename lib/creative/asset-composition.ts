@@ -1,14 +1,75 @@
 import type { BrandProfile } from "../brand/profile";
 import type { GeneratedVisualAsset } from "./assets";
-import type { TypographicPiece, TypographicVariant } from "./typographic-piece";
+import type { TypographicPiece } from "./typographic-piece";
 import {
   TYPOGRAPHIC_POST_HEIGHT,
   TYPOGRAPHIC_POST_WIDTH,
 } from "./typographic-piece";
 
+export type AssetCompositionVariantId =
+  | "lower-panel"
+  | "editorial-split"
+  | "clean-band";
+
+export type AssetCompositionVariant = {
+  id: AssetCompositionVariantId;
+  name: string;
+  layoutFamily: string;
+  rationale: string;
+};
+
+export const assetCompositionVariants: AssetCompositionVariant[] = [
+  {
+    id: "lower-panel",
+    name: "Painel inferior",
+    layoutFamily: "Imagem como assunto, copy em painel escuro no terco inferior.",
+    rationale:
+      "Mais seguro para legibilidade quando o asset tem assunto forte no topo.",
+  },
+  {
+    id: "editorial-split",
+    name: "Editorial lateral",
+    layoutFamily: "Faixa editorial vertical, texto em coluna e asset respirando.",
+    rationale:
+      "Boa para pecas com imagem menos poluida e headline curta ou media.",
+  },
+  {
+    id: "clean-band",
+    name: "Faixa limpa",
+    layoutFamily: "Asset dominante com faixa clara de leitura no rodape.",
+    rationale:
+      "Boa quando a imagem ja tem peso visual e a copy precisa soar mais leve.",
+  },
+];
+
+export function getAssetCompositionVariant(
+  variantId?: string | null,
+): AssetCompositionVariant {
+  return (
+    assetCompositionVariants.find((variant) => variant.id === variantId) ||
+    assetCompositionVariants[0]
+  );
+}
+
 export function renderAssetCompositeSvg(
   piece: TypographicPiece,
-  variant: TypographicVariant,
+  brandProfile: BrandProfile,
+  asset: GeneratedVisualAsset,
+  compositionVariant: AssetCompositionVariant,
+) {
+  if (compositionVariant.id === "editorial-split") {
+    return renderEditorialSplit(piece, brandProfile, asset);
+  }
+
+  if (compositionVariant.id === "clean-band") {
+    return renderCleanBand(piece, brandProfile, asset);
+  }
+
+  return renderLowerPanel(piece, brandProfile, asset);
+}
+
+function renderLowerPanel(
+  piece: TypographicPiece,
   brandProfile: BrandProfile,
   asset: GeneratedVisualAsset,
 ) {
@@ -17,11 +78,10 @@ export function renderAssetCompositeSvg(
   const headlineLines = wrapText(piece.copy.headline, 23, 4);
   const supportLines = wrapText(piece.copy.support, 54, 2);
   const ctaLines = wrapText(piece.copy.cta, 30, 1);
-  const isConversationVariant = variant.id === "conversation-clean";
-  const panelX = isConversationVariant ? 88 : 84;
-  const panelY = isConversationVariant ? 640 : 626;
-  const panelWidth = isConversationVariant ? 904 : 912;
-  const panelHeight = isConversationVariant ? 526 : 548;
+  const panelX = 84;
+  const panelY = 626;
+  const panelWidth = 912;
+  const panelHeight = 548;
   const panelPaddingX = 42;
   const headlineSize =
     headlineLines.length >= 4 ? 60 : headlineLines.length === 3 ? 68 : 78;
@@ -72,6 +132,136 @@ export function renderAssetCompositeSvg(
       y: footerY,
       size: 28,
       lineHeight: 36,
+      weight: 820,
+      fill: palette.accent,
+      font: font.body,
+      anchor: "end",
+    })}
+  `);
+}
+
+function renderEditorialSplit(
+  piece: TypographicPiece,
+  brandProfile: BrandProfile,
+  asset: GeneratedVisualAsset,
+) {
+  const palette = buildPalette(brandProfile);
+  const font = buildFontFamilies(brandProfile);
+  const headlineLines = wrapText(piece.copy.headline, 14, 5);
+  const supportLines = wrapText(piece.copy.support, 28, 3);
+  const ctaLines = wrapText(piece.copy.cta, 22, 1);
+  const headlineSize =
+    headlineLines.length >= 5 ? 56 : headlineLines.length >= 4 ? 62 : 70;
+  const headlineLineHeight = headlineSize + 8;
+  const panelX = 68;
+  const panelY = 86;
+  const panelWidth = 484;
+  const panelHeight = 1178;
+  const contentX = panelX + 42;
+  const headlineY = panelY + 260;
+  const supportY = headlineY + headlineLines.length * headlineLineHeight + 58;
+
+  return svgShell(`
+    <defs>
+      <linearGradient id="splitOverlay" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${palette.text}" stop-opacity="0.46" />
+        <stop offset="54%" stop-color="${palette.text}" stop-opacity="0.08" />
+        <stop offset="100%" stop-color="${palette.text}" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    <rect width="1080" height="1350" fill="${palette.background}" />
+    <image href="${escapeAttribute(asset.dataUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" />
+    <rect width="1080" height="1350" fill="url(#splitOverlay)" />
+    <rect x="${panelX}" y="${panelY}" width="${panelWidth}" height="${panelHeight}" fill="${palette.primary}" fill-opacity="0.93" />
+    <rect x="${panelX}" y="${panelY}" width="10" height="${panelHeight}" fill="${palette.accent}" />
+    <text x="${contentX}" y="${panelY + 72}" ${font.body} font-size="28" font-weight="850" fill="${palette.light}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
+    ${renderTextLines({
+      lines: headlineLines,
+      x: contentX,
+      y: headlineY,
+      size: headlineSize,
+      lineHeight: headlineLineHeight,
+      weight: 900,
+      fill: palette.light,
+      font: font.heading,
+    })}
+    ${renderTextLines({
+      lines: supportLines,
+      x: contentX,
+      y: supportY,
+      size: 30,
+      lineHeight: 39,
+      weight: 720,
+      fill: palette.light,
+      font: font.body,
+    })}
+    ${renderTextLines({
+      lines: ctaLines,
+      x: contentX,
+      y: panelY + panelHeight - 58,
+      size: 28,
+      lineHeight: 36,
+      weight: 820,
+      fill: palette.accent,
+      font: font.body,
+    })}
+  `);
+}
+
+function renderCleanBand(
+  piece: TypographicPiece,
+  brandProfile: BrandProfile,
+  asset: GeneratedVisualAsset,
+) {
+  const palette = buildPalette(brandProfile);
+  const font = buildFontFamilies(brandProfile);
+  const headlineLines = wrapText(piece.copy.headline, 28, 3);
+  const supportLines = wrapText(piece.copy.support, 54, 2);
+  const ctaLines = wrapText(piece.copy.cta, 30, 1);
+  const bandX = 72;
+  const bandY = 864;
+  const bandWidth = 936;
+  const bandHeight = 342;
+  const contentX = bandX + 42;
+  const headlineSize =
+    headlineLines.length >= 3 ? 58 : headlineLines.length === 2 ? 66 : 74;
+  const headlineLineHeight = headlineSize + 8;
+  const headlineY = bandY + 104;
+  const supportY = headlineY + headlineLines.length * headlineLineHeight + 34;
+
+  return svgShell(`
+    <rect width="1080" height="1350" fill="${palette.background}" />
+    <image href="${escapeAttribute(asset.dataUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" />
+    <rect x="0" y="0" width="1080" height="1350" fill="${palette.text}" opacity="0.1" />
+    <rect x="${bandX}" y="${bandY}" width="${bandWidth}" height="${bandHeight}" fill="${palette.background}" fill-opacity="0.96" />
+    <rect x="${bandX}" y="${bandY}" width="${bandWidth}" height="10" fill="${palette.accent}" />
+    <text x="${contentX}" y="${bandY + 54}" ${font.body} font-size="25" font-weight="850" fill="${palette.primary}">${escapeXml(brandProfile.brandName || "Social Studio")}</text>
+    ${renderTextLines({
+      lines: headlineLines,
+      x: contentX,
+      y: headlineY,
+      size: headlineSize,
+      lineHeight: headlineLineHeight,
+      weight: 900,
+      fill: palette.text,
+      font: font.heading,
+    })}
+    ${renderTextLines({
+      lines: supportLines,
+      x: contentX,
+      y: supportY,
+      size: 28,
+      lineHeight: 36,
+      weight: 700,
+      fill: palette.primary,
+      font: font.body,
+    })}
+    ${renderTextLines({
+      lines: ctaLines,
+      x: bandX + bandWidth - 42,
+      y: bandY + bandHeight - 42,
+      size: 26,
+      lineHeight: 34,
       weight: 820,
       fill: palette.accent,
       font: font.body,
