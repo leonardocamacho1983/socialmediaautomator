@@ -290,6 +290,7 @@ export async function POST(request: Request) {
         code: "VISUAL_ASSET_GENERATION_FAILED",
         error:
           "Nao foi possivel gerar o asset visual. Tente uma direcao mais concreta.",
+        details: publicErrorDetail(error),
       },
       { status: 502 },
     );
@@ -317,4 +318,14 @@ function isGatewayAuthenticationFailure(error: unknown) {
     error.message.includes("No authentication provided") ||
     error.message.includes("AI_GATEWAY_API_KEY")
   );
+}
+
+function publicErrorDetail(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unknown error";
+  }
+
+  const detail = `${error.name}: ${error.message}`.replace(/\s+/g, " ").trim();
+
+  return detail.slice(0, 700);
 }
