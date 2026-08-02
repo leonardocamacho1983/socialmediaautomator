@@ -10,6 +10,7 @@ const checks = [
   "Marco 3.5 com cockpit, filtros e busca dos aprovados",
   "Marco 4.0 com geracao minima de assets visuais",
   "Marco 4.1 com variacoes, rejeicao e aprovacao visual",
+  "Marco 4.2 com pacote final, ZIP e historico visual",
   "Sem carrossel, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];

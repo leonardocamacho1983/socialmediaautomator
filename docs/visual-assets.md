@@ -1,13 +1,13 @@
-# Marco 4.1 Visual Asset Review
+# Marco 4.2 Final Package Export
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 4.1 extends the visual asset step after a final post package has been
+Marco 4.2 extends the visual asset step after a final post package has been
 approved. The goal is no longer only generating one image: the approved post
-detail now supports reviewing, rejecting, regenerating, composing, and approving
-the visual version of the post.
+detail now supports reviewing, rejecting, regenerating, composing, approving,
+finalizing, and exporting the complete post package.
 
 Included:
 
@@ -29,7 +29,12 @@ Included:
 - undo for accidental asset rejection;
 - automatic regeneration prompt from the rejection reason;
 - final visual approval status;
-- visual status shown in `/approved`.
+- visual status shown in `/approved`;
+- final package status shown in `/approved`;
+- visual event history for generation, selection, rejection, restoration,
+  deletion, visual approval, and package finalization;
+- delete generated assets from a post;
+- final package ZIP export with PNG, copy, prompt, metadata, and visual history.
 
 The model prompt explicitly asks for visual-only output. Text, letters, logos,
 captions, watermarks, and UI labels must stay out of the generated image because
@@ -82,7 +87,7 @@ available.
 
 ## Local Storage Contract
 
-Marco 4.1 extends approved post records in:
+Marco 4.2 extends approved post records in:
 
 ```text
 socialmediaautomator.approvedPosts.v1
@@ -97,6 +102,9 @@ selectedAssetCompositionId: AssetCompositionVariantId
 visualStatus: ApprovedPostVisualStatus
 visualApprovedAt: string | null
 visualAssetRejections: VisualAssetRejection[]
+visualEvents: ApprovedPostVisualEvent[]
+finalPackageStatus: ApprovedPostFinalPackageStatus
+finalPackageReadyAt: string | null
 ```
 
 The assets are currently stored as data URLs in browser localStorage and capped
@@ -129,5 +137,14 @@ Manual validation:
    selected again.
 10. Generate another asset if needed.
 11. Approve the final visual version.
-12. Confirm `/approved` shows the visual status.
-13. Download the PNG and confirm it is 1080x1350.
+12. Finalize the package.
+13. Download the ZIP and confirm it includes:
+    - `final/post-1080x1350.png`;
+    - `copy/legenda.txt`;
+    - `copy/primeiro-comentario.txt`;
+    - `copy/hashtags.txt`;
+    - `asset/asset-prompt.txt`;
+    - `metadata.json`;
+    - `visual-history.json`.
+14. Confirm `/approved` shows visual and package status.
+15. Download the PNG and confirm it is 1080x1350.

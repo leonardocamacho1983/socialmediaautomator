@@ -19,6 +19,7 @@ This repository currently contains:
 - Marco 3.5 Approved Posts Cockpit filters inside `/approved`.
 - Marco 4.0 Visual Asset Engine inside `/approved/[postId]`.
 - Marco 4.1 Visual Asset Review, composition variants, rejection, and approval.
+- Marco 4.2 Final Package Export with ZIP, visual history, and package status.
 
 The app still does not generate carousels, automations, analytics, durable
 asset storage, or publications.

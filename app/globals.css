@@ -138,6 +138,11 @@ h1 {
   background: var(--accent-warm);
 }
 
+.secondary-danger {
+  border-color: color-mix(in srgb, var(--accent-warm) 42%, var(--border));
+  color: #7a2415;
+}
+
 .health-link,
 .secondary-button,
 .text-link {
@@ -1113,7 +1118,7 @@ h2 {
 
 .approved-visual-cockpit {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -1312,6 +1317,27 @@ h2 {
 }
 
 .visual-status-visual_approved {
+  background: #101514;
+  color: #eaf3ee;
+}
+
+.package-status {
+  width: fit-content;
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.package-status-open {
+  background: #ffffff;
+  color: var(--muted);
+}
+
+.package-status-ready {
+  border-color: #101514;
   background: #101514;
   color: #eaf3ee;
 }
@@ -1727,6 +1753,66 @@ h2 {
   font-size: 0.84rem;
 }
 
+.final-package-card {
+  margin-top: 20px;
+}
+
+.final-package-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.final-package-grid div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.final-package-grid strong {
+  color: var(--foreground);
+  font-size: 0.84rem;
+}
+
+.final-package-grid span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.visual-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.visual-history-item {
+  display: grid;
+  gap: 4px;
+  border-left: 4px solid var(--accent);
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.visual-history-item strong {
+  color: var(--foreground);
+  font-size: 0.95rem;
+}
+
+.visual-history-item span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 720;
+}
+
+.visual-history-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -1777,6 +1863,7 @@ h2 {
   .approved-cockpit,
   .approved-visual-cockpit,
   .asset-composition-grid,
+  .final-package-grid,
   .approved-filter-panel {
     grid-template-columns: 1fr;
   }

@@ -16,6 +16,8 @@ import {
   buildApprovedPostText,
   buildApprovedPostView,
   createDuplicateProjectFromApprovedPost,
+  deleteApprovedPostAsset,
+  finalizeApprovedPostPackage,
   getVisualAssetRejectionReason,
   parseApprovedPosts,
   rejectApprovedPostAsset,
@@ -26,6 +28,7 @@ import {
   updateApprovedPostStatus,
   visualAssetRejectionReasons,
   type ApprovedPost,
+  type ApprovedPostFinalPackageStatus,
   type ApprovedPostStatus,
   type ApprovedPostVisualStatus,
   type VisualAssetRejectionReasonId,
@@ -36,17 +39,31 @@ import {
   type GeneratedVisualAsset,
 } from "../../../lib/creative/assets";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
-import { downloadSvgAsPng, slugify } from "../../create/export-utils";
+import {
+  downloadSvgAsPng,
+  downloadZipFile,
+  slugify,
+  svgToPngBlob,
+  type ZipDownloadFile,
+} from "../../create/export-utils";
 
 type ApprovedPostDetailProps = {
   postId: string;
 };
+
+type ApprovedPostView = NonNullable<ReturnType<typeof buildApprovedPostView>>;
 
 const statusLabels: Record<ApprovedPostStatus, string> = {
   approved: "Aprovado",
   exported: "Exportado",
   ready_to_publish: "Pronto para publicar",
 };
+
+const finalPackageStatusLabels: Record<ApprovedPostFinalPackageStatus, string> =
+  {
+    open: "Pacote em aberto",
+    ready: "Pacote pronto",
+  };
 
 const visualStatusLabels: Record<ApprovedPostVisualStatus, string> = {
   typographic_only: "So tipografico",
@@ -177,6 +194,74 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       window.setTimeout(() => setStatus(""), 2600);
     } catch {
       setStatus("Nao foi possivel baixar o PNG.");
+    }
+  }
+
+  async function downloadFinalPackage() {
+    if (!post || !view) {
+      setStatus("Post aprovado incompleto.");
+      return;
+    }
+
+    if (post.finalPackageStatus !== "ready") {
+      setStatus("Finalize o pacote antes de baixar o ZIP.");
+      return;
+    }
+
+    setStatus("Montando ZIP...");
+
+    try {
+      const exportSvg = view.assetSvg || view.svg;
+      const pngBlob = await svgToPngBlob(exportSvg);
+      const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}`;
+      const files: ZipDownloadFile[] = [
+        {
+          name: "final/post-1080x1350.png",
+          content: pngBlob,
+        },
+        {
+          name: "copy/legenda.txt",
+          content: view.caption,
+        },
+        {
+          name: "copy/primeiro-comentario.txt",
+          content: view.firstComment || "",
+        },
+        {
+          name: "copy/hashtags.txt",
+          content: view.hashtags || "",
+        },
+        {
+          name: "asset/asset-prompt.txt",
+          content: view.selectedAsset?.prompt || "Sem asset visual selecionado.",
+        },
+        {
+          name: "metadata.json",
+          content: JSON.stringify(buildFinalPackageMetadata(post, view), null, 2),
+        },
+        {
+          name: "visual-history.json",
+          content: JSON.stringify(post.visualEvents, null, 2),
+        },
+        {
+          name: "README.txt",
+          content: buildFinalPackageReadme(post),
+        },
+      ];
+
+      if (view.selectedAsset?.dataUrl) {
+        files.push({
+          name: "asset/selected-asset.png",
+          content: dataUrlToBlob(view.selectedAsset.dataUrl),
+        });
+      }
+
+      await downloadZipFile(files, `${baseFileName}-pacote-final.zip`);
+      persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
+      setStatus("ZIP exportado.");
+      window.setTimeout(() => setStatus(""), 2600);
+    } catch {
+      setStatus("Nao foi possivel baixar o pacote final.");
     }
   }
 
@@ -317,6 +402,34 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     window.setTimeout(() => setStatus(""), 2400);
   }
 
+  function finalizePackage() {
+    if (!post) {
+      return;
+    }
+
+    if (post.visualStatus !== "visual_approved") {
+      setStatus("Aprove o visual final antes de finalizar o pacote.");
+      setAssetStatus("Aprove o visual final antes de finalizar o pacote.");
+      return;
+    }
+
+    persistPosts(finalizeApprovedPostPackage(posts, post.id));
+    setStatus("Pacote finalizado.");
+    setAssetStatus("Pacote final pronto para baixar.");
+    window.setTimeout(() => setStatus(""), 2600);
+  }
+
+  function deleteAsset(assetId: string) {
+    if (!post) {
+      return;
+    }
+
+    persistPosts(deleteApprovedPostAsset(posts, post.id, assetId));
+    setAssetStatus("Asset apagado da lista.");
+    setStatus("Asset apagado.");
+    window.setTimeout(() => setStatus(""), 2400);
+  }
+
   if (!post) {
     return (
       <main className="brand-shell approved-detail-shell">
@@ -333,7 +446,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             </Link>
           </div>
           <div>
-            <p className="eyebrow">Marco 4.1</p>
+            <p className="eyebrow">Marco 4.2</p>
             <h1>Post nao encontrado</h1>
             <p className="lead">
               Este post nao existe na biblioteca local deste navegador.
@@ -370,7 +483,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 4.1</p>
+          <p className="eyebrow">Marco 4.2</p>
           <h1>{post.title}</h1>
           <p className="lead">
             Revisao individual do post aprovado, com escolha de asset,
@@ -386,6 +499,11 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         </span>
         <span className={`visual-status visual-status-${post.visualStatus}`}>
           {visualStatusLabels[post.visualStatus]}
+        </span>
+        <span
+          className={`package-status package-status-${post.finalPackageStatus}`}
+        >
+          {finalPackageStatusLabels[post.finalPackageStatus]}
         </span>
         <button className="primary-button" type="button" onClick={openPost}>
           Editar no fluxo
@@ -477,6 +595,20 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                     <dt>Status visual</dt>
                     <dd>{visualStatusLabels[post.visualStatus]}</dd>
                   </div>
+                  <div>
+                    <dt>Pacote</dt>
+                    <dd>{finalPackageStatusLabels[post.finalPackageStatus]}</dd>
+                  </div>
+                  {post.finalPackageReadyAt ? (
+                    <div>
+                      <dt>Finalizado em</dt>
+                      <dd>
+                        {new Date(post.finalPackageReadyAt).toLocaleString(
+                          "pt-BR",
+                        )}
+                      </dd>
+                    </div>
+                  ) : null}
                   {view.selectedAsset ? (
                     <div>
                       <dt>Composicao</dt>
@@ -692,6 +824,13 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
                   >
                     {selected ? "Selecionado" : "Usar este asset"}
                   </button>
+                  <button
+                    className="secondary-button secondary-danger"
+                    type="button"
+                    onClick={() => deleteAsset(asset.id)}
+                  >
+                    Apagar asset
+                  </button>
                   {selected && !rejection ? (
                     <div className="asset-rejection-actions">
                       <strong>Rejeitar asset</strong>
@@ -716,6 +855,72 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             Nenhum asset visual gerado para este post ainda.
           </p>
         )}
+      </section>
+
+      <section className="approved-detail-card final-package-card">
+        <div className="asset-section-heading">
+          <div>
+            <p className="section-kicker">Pacote final</p>
+            <h2>Fechar entrega do post</h2>
+          </div>
+          <span
+            className={`package-status package-status-${post.finalPackageStatus}`}
+          >
+            {finalPackageStatusLabels[post.finalPackageStatus]}
+          </span>
+        </div>
+
+        <div className="final-package-grid">
+          <div>
+            <strong>Imagem final</strong>
+            <span>{view?.selectedAsset ? "Com asset visual" : "Tipografico"}</span>
+          </div>
+          <div>
+            <strong>Legenda</strong>
+            <span>{view?.caption ? "Incluida" : "Indisponivel"}</span>
+          </div>
+          <div>
+            <strong>Comentario</strong>
+            <span>{view?.firstComment ? "Incluido" : "Vazio"}</span>
+          </div>
+          <div>
+            <strong>Historico</strong>
+            <span>
+              {post.visualEvents.length === 1
+                ? "1 evento"
+                : `${post.visualEvents.length} eventos`}
+            </span>
+          </div>
+        </div>
+
+        <div className="approved-detail-actions">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={finalizePackage}
+            disabled={
+              post.visualStatus !== "visual_approved" ||
+              post.finalPackageStatus === "ready"
+            }
+          >
+            {post.finalPackageStatus === "ready"
+              ? "Pacote finalizado"
+              : "Finalizar pacote"}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={downloadFinalPackage}
+            disabled={!view || post.finalPackageStatus !== "ready"}
+          >
+            Baixar ZIP
+          </button>
+        </div>
+
+        <p className="approved-detail-muted">
+          O ZIP inclui PNG final 1080x1350, legenda, primeiro comentario,
+          hashtags, prompt do asset, metadados e historico visual.
+        </p>
       </section>
 
       <section className="approved-detail-copy-grid">
@@ -800,6 +1005,25 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       </section>
 
       <section className="approved-detail-card">
+        <p className="section-kicker">Historico visual</p>
+        {post.visualEvents.length ? (
+          <div className="visual-history-list">
+            {post.visualEvents.map((event) => (
+              <article className="visual-history-item" key={event.id}>
+                <strong>{event.label}</strong>
+                <span>{new Date(event.createdAt).toLocaleString("pt-BR")}</span>
+                <p>{event.detail}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="approved-detail-muted">
+            Nenhuma decisao visual registrada ainda.
+          </p>
+        )}
+      </section>
+
+      <section className="approved-detail-card">
         <p className="section-kicker">Checklist final</p>
         {finalChecklist.length ? (
           <div className="approved-detail-checklist">
@@ -843,4 +1067,96 @@ function saveProjectSnapshot(
     CREATIVE_PROJECT_STORAGE_KEY,
     JSON.stringify(projectSnapshot),
   );
+}
+
+function buildFinalPackageMetadata(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+) {
+  return {
+    id: post.id,
+    title: post.title,
+    brandName: post.brandName,
+    approvedAt: post.approvedAt,
+    finalPackageStatus: post.finalPackageStatus,
+    finalPackageReadyAt: post.finalPackageReadyAt,
+    operationalStatus: post.status,
+    visualStatus: post.visualStatus,
+    concept: {
+      id: view.concept.id,
+      title: view.concept.title,
+      hook: view.concept.hook,
+      centralIdea: view.concept.centralIdea,
+      recommendedFormat: view.concept.recommendedFormat,
+      visualDirection: view.concept.visualDirection,
+    },
+    typography: {
+      variant: view.typographicVariant.name,
+      headline: view.typographicPiece.copy.headline,
+      support: view.typographicPiece.copy.support,
+      cta: view.typographicPiece.copy.cta,
+    },
+    caption: {
+      variant: view.captionVariant.label,
+      caption: view.caption,
+      firstComment: view.firstComment,
+      hashtags: view.hashtags,
+    },
+    visualAsset: view.selectedAsset
+      ? {
+          id: view.selectedAsset.id,
+          provider: view.selectedAsset.provider,
+          model: view.selectedAsset.model,
+          prompt: view.selectedAsset.prompt,
+          generatedAt: view.selectedAsset.generatedAt,
+        }
+      : null,
+    composition: view.selectedAsset
+      ? {
+          id: view.selectedAssetCompositionVariant.id,
+          name: view.selectedAssetCompositionVariant.name,
+          layoutFamily: view.selectedAssetCompositionVariant.layoutFamily,
+        }
+      : null,
+    notes: post.notes,
+  };
+}
+
+function buildFinalPackageReadme(post: ApprovedPost) {
+  return [
+    "Pacote final de post",
+    "",
+    `Titulo: ${post.title}`,
+    `Marca: ${post.brandName}`,
+    `Status: ${post.finalPackageStatus === "ready" ? "pronto" : "em aberto"}`,
+    post.finalPackageReadyAt
+      ? `Finalizado em: ${new Date(post.finalPackageReadyAt).toLocaleString("pt-BR")}`
+      : "",
+    "",
+    "Arquivos:",
+    "- final/post-1080x1350.png",
+    "- copy/legenda.txt",
+    "- copy/primeiro-comentario.txt",
+    "- copy/hashtags.txt",
+    "- asset/asset-prompt.txt",
+    "- asset/selected-asset.png, quando houver asset selecionado",
+    "- metadata.json",
+    "- visual-history.json",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [header, encodedData] = dataUrl.split(",");
+  const mimeMatch = header.match(/^data:([^;]+);base64$/);
+  const mimeType = mimeMatch?.[1] || "application/octet-stream";
+  const binary = window.atob(encodedData || "");
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
 }

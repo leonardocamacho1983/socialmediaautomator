@@ -1,11 +1,11 @@
-# Marco 4.1 Approved Post Detail
+# Marco 4.2 Approved Post Detail
 
 Date: 2026-08-02
 
 ## Scope
 
-Marco 4.1 keeps the individual review page for each locally approved post and
-adds final visual review controls.
+Marco 4.2 keeps the individual review page for each locally approved post and
+adds final package controls.
 
 Included:
 
@@ -24,7 +24,11 @@ Included:
 - choose between image-led composition variants;
 - reject weak assets with a reason;
 - prepare regeneration instructions from the rejection reason;
-- approve the final visual version.
+- approve the final visual version;
+- delete generated assets;
+- finalize the post package;
+- download a ZIP with final PNG, copy, metadata, and visual history;
+- show the visual event history.
 
 Not included:
 
@@ -49,9 +53,11 @@ are normalized to an empty string when read.
 
 Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Marco 4.1 adds
 `selectedAssetCompositionId`, `visualStatus`, `visualApprovedAt`, and
-`visualAssetRejections`. Older records without asset fields are normalized to an
-empty asset list, no selected asset, the default composition, and
-typographic-only visual status.
+`visualAssetRejections`. Marco 4.2 adds `visualEvents`,
+`finalPackageStatus`, and `finalPackageReadyAt`. Older records without asset
+fields are normalized to an empty asset list, no selected asset, the default
+composition, typographic-only visual status, empty visual history, and package
+status open.
 
 This is still browser-local state. It is not a durable production content
 database.
@@ -80,3 +86,6 @@ Manual validation:
 8. Use `Editar no fluxo` and confirm the approved package opens in `/create`.
 9. Use `Duplicar` and confirm a new editable project is created without final
    approval.
+10. Approve a visual version and finalize the package.
+11. Download the ZIP and confirm it includes final image, copy files, metadata,
+    and visual history.

@@ -18,6 +18,7 @@ import {
   parseApprovedPosts,
   updateApprovedPostStatus,
   type ApprovedPost,
+  type ApprovedPostFinalPackageStatus,
   type ApprovedPostStatus,
   type ApprovedPostVisualStatus,
 } from "../../lib/creative/approved-posts";
@@ -36,6 +37,12 @@ const visualStatusLabels: Record<ApprovedPostVisualStatus, string> = {
   asset_rejected: "Asset rejeitado",
   visual_approved: "Visual aprovado",
 };
+
+const finalPackageStatusLabels: Record<ApprovedPostFinalPackageStatus, string> =
+  {
+    open: "Pacote em aberto",
+    ready: "Pacote pronto",
+  };
 
 type ApprovedPostFilter = ApprovedPostStatus | "all";
 
@@ -68,6 +75,10 @@ export function ApprovedPostLibrary() {
   const statusCounts = useMemo(() => countPostsByStatus(posts), [posts]);
   const visualStatusCounts = useMemo(
     () => countPostsByVisualStatus(posts),
+    [posts],
+  );
+  const readyPackageCount = useMemo(
+    () => posts.filter((post) => post.finalPackageStatus === "ready").length,
     [posts],
   );
   const normalizedSearchTerm = normalizeSearchText(searchTerm);
@@ -169,12 +180,12 @@ export function ApprovedPostLibrary() {
           </Link>
         </div>
         <div>
-          <p className="eyebrow">Marco 4.1</p>
+          <p className="eyebrow">Marco 4.2</p>
           <h1>Posts aprovados</h1>
           <p className="lead">
             Cockpit local dos pacotes finais aprovados, agora com status visual
-            dos assets. Ainda sem Zernio, calendario, publicacao, banco de
-            dados ou automacao.
+            e pacotes prontos para exportacao. Ainda sem Zernio, calendario,
+            publicacao, banco de dados ou automacao.
           </p>
         </div>
       </header>
@@ -267,6 +278,10 @@ export function ApprovedPostLibrary() {
           <span>{visualStatusLabels.visual_approved}</span>
           <strong>{visualStatusCounts.visual_approved}</strong>
         </div>
+        <div className="approved-visual-metric">
+          <span>{finalPackageStatusLabels.ready}</span>
+          <strong>{readyPackageCount}</strong>
+        </div>
       </section>
 
       <section className="approved-filter-panel" aria-label="Filtros">
@@ -348,6 +363,11 @@ export function ApprovedPostLibrary() {
                       className={`visual-status visual-status-${post.visualStatus}`}
                     >
                       {visualStatusLabels[post.visualStatus]}
+                    </span>
+                    <span
+                      className={`package-status package-status-${post.finalPackageStatus}`}
+                    >
+                      {finalPackageStatusLabels[post.finalPackageStatus]}
                     </span>
                     <strong>{post.title}</strong>
                     <small>

@@ -19,11 +19,22 @@ export const APPROVED_POSTS_STORAGE_KEY =
   "socialmediaautomator.approvedPosts.v1";
 
 export type ApprovedPostStatus = "approved" | "exported" | "ready_to_publish";
+export type ApprovedPostFinalPackageStatus = "open" | "ready";
 export type ApprovedPostVisualStatus =
   | "typographic_only"
   | "asset_generated"
   | "asset_rejected"
   | "visual_approved";
+export type ApprovedPostVisualEventType =
+  | "asset_generated"
+  | "asset_selected"
+  | "asset_removed"
+  | "composition_changed"
+  | "asset_rejected"
+  | "asset_restored"
+  | "asset_deleted"
+  | "visual_approved"
+  | "package_finalized";
 export type VisualAssetRejectionReasonId =
   | "contains_text"
   | "too_generic"
@@ -42,6 +53,16 @@ export type VisualAssetRejection = {
   reasonId: VisualAssetRejectionReasonId;
   note: string;
   rejectedAt: string;
+};
+
+export type ApprovedPostVisualEvent = {
+  id: string;
+  type: ApprovedPostVisualEventType;
+  label: string;
+  detail: string;
+  createdAt: string;
+  assetId?: string;
+  compositionId?: AssetCompositionVariantId;
 };
 
 export const visualAssetRejectionReasons: VisualAssetRejectionReason[] = [
@@ -84,6 +105,8 @@ export type ApprovedPost = {
   approvedAt: string;
   updatedAt: string;
   status: ApprovedPostStatus;
+  finalPackageStatus: ApprovedPostFinalPackageStatus;
+  finalPackageReadyAt: string | null;
   notes: string;
   generatedAssets: GeneratedVisualAsset[];
   selectedVisualAssetId: string | null;
@@ -91,6 +114,7 @@ export type ApprovedPost = {
   visualStatus: ApprovedPostVisualStatus;
   visualApprovedAt: string | null;
   visualAssetRejections: VisualAssetRejection[];
+  visualEvents: ApprovedPostVisualEvent[];
   projectSnapshot: CreativeProject;
 };
 
@@ -103,6 +127,9 @@ type StoredApprovedPost = Omit<
   | "visualStatus"
   | "visualApprovedAt"
   | "visualAssetRejections"
+  | "visualEvents"
+  | "finalPackageStatus"
+  | "finalPackageReadyAt"
 > & {
   notes?: string;
   generatedAssets?: GeneratedVisualAsset[];
@@ -111,6 +138,9 @@ type StoredApprovedPost = Omit<
   visualStatus?: string | null;
   visualApprovedAt?: string | null;
   visualAssetRejections?: VisualAssetRejection[];
+  visualEvents?: ApprovedPostVisualEvent[];
+  finalPackageStatus?: string | null;
+  finalPackageReadyAt?: string | null;
 };
 
 export function createApprovedPostFromProject(
@@ -132,6 +162,8 @@ export function createApprovedPostFromProject(
     approvedAt: project.finalPostPackage.approvedAt,
     updatedAt: new Date().toISOString(),
     status: "approved",
+    finalPackageStatus: "open",
+    finalPackageReadyAt: null,
     notes: "",
     generatedAssets: [],
     selectedVisualAssetId: null,
@@ -139,6 +171,7 @@ export function createApprovedPostFromProject(
     visualStatus: "typographic_only",
     visualApprovedAt: null,
     visualAssetRejections: [],
+    visualEvents: [],
     projectSnapshot: project,
   };
 }
@@ -162,6 +195,7 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
       const visualAssetRejections = normalizeVisualAssetRejections(
         post.visualAssetRejections,
       );
+      const visualEvents = normalizeVisualEvents(post.visualEvents);
 
       return {
         ...post,
@@ -179,6 +213,13 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
             ? post.visualApprovedAt
             : null,
         visualAssetRejections,
+        visualEvents,
+        finalPackageStatus:
+          post.finalPackageStatus === "ready" ? "ready" : "open",
+        finalPackageReadyAt:
+          typeof post.finalPackageReadyAt === "string"
+            ? post.finalPackageReadyAt
+            : null,
       };
     });
 }
@@ -202,6 +243,9 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
           visualStatus: item.visualStatus || ("typographic_only" as const),
           visualApprovedAt: item.visualApprovedAt || null,
           visualAssetRejections: item.visualAssetRejections || [],
+          visualEvents: item.visualEvents || [],
+          finalPackageStatus: item.finalPackageStatus || "open",
+          finalPackageReadyAt: item.finalPackageReadyAt || null,
         }
       : item,
   );
@@ -257,6 +301,17 @@ export function appendApprovedPostAssets(
       selectedVisualAssetId: post.selectedVisualAssetId || assets[0]?.id || null,
       visualStatus: "asset_generated",
       visualApprovedAt: null,
+      finalPackageStatus: "open",
+      finalPackageReadyAt: null,
+      visualEvents: appendVisualEvent(post, {
+        type: "asset_generated",
+        label: assets.length === 1 ? "Asset gerado" : "Assets gerados",
+        detail:
+          assets.length === 1
+            ? "Um novo asset visual foi gerado e anexado ao post."
+            : `${assets.length} novos assets visuais foram gerados e anexados ao post.`,
+        assetId: assets[0]?.id,
+      }),
       updatedAt: new Date().toISOString(),
     };
   });
@@ -274,7 +329,17 @@ export function selectApprovedPostAsset(
           selectedVisualAssetId: assetId,
           visualStatus: nextVisualStatusForAssetSelection(post, assetId),
           visualApprovedAt: null,
+          finalPackageStatus: "open" as const,
+          finalPackageReadyAt: null,
           status: assetId ? post.status : "approved",
+          visualEvents: appendVisualEvent(post, {
+            type: assetId ? "asset_selected" : "asset_removed",
+            label: assetId ? "Asset selecionado" : "Asset removido",
+            detail: assetId
+              ? "Um asset foi selecionado para a composicao final."
+              : "O post voltou para a versao tipografica.",
+            assetId: assetId || undefined,
+          }),
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -296,8 +361,16 @@ export function selectApprovedPostAssetComposition(
               ? "asset_generated"
               : post.visualStatus,
           visualApprovedAt: null,
+          finalPackageStatus: "open" as const,
+          finalPackageReadyAt: null,
           status:
             post.visualStatus === "visual_approved" ? "approved" : post.status,
+          visualEvents: appendVisualEvent(post, {
+            type: "composition_changed",
+            label: "Composicao alterada",
+            detail: `A composicao visual foi alterada para ${getAssetCompositionVariant(compositionId).name}.`,
+            compositionId,
+          }),
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -322,6 +395,8 @@ export function rejectApprovedPostAsset(
               : post.selectedVisualAssetId,
           visualStatus: "asset_rejected",
           visualApprovedAt: null,
+          finalPackageStatus: "open" as const,
+          finalPackageReadyAt: null,
           status: "approved" as ApprovedPostStatus,
           visualAssetRejections: [
             {
@@ -334,6 +409,12 @@ export function rejectApprovedPostAsset(
               (rejection) => rejection.assetId !== assetId,
             ),
           ].slice(0, 24),
+          visualEvents: appendVisualEvent(post, {
+            type: "asset_rejected",
+            label: "Asset rejeitado",
+            detail: `Asset rejeitado por: ${reason.label}.`,
+            assetId,
+          }),
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -366,8 +447,60 @@ export function restoreApprovedPostAsset(
           ? "asset_rejected"
           : nextVisualStatusForAssetSelection(post, post.selectedVisualAssetId),
       visualApprovedAt: null,
+      finalPackageStatus: "open",
+      finalPackageReadyAt: null,
       status: assetExists ? "approved" : post.status,
       visualAssetRejections,
+      visualEvents: appendVisualEvent(post, {
+        type: "asset_restored",
+        label: "Rejeicao desfeita",
+        detail: "A rejeicao foi removida e o asset voltou para a composicao.",
+        assetId,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+export function deleteApprovedPostAsset(
+  posts: ApprovedPost[],
+  postId: string,
+  assetId: string,
+): ApprovedPost[] {
+  return posts.map((post) => {
+    if (post.id !== postId) {
+      return post;
+    }
+
+    const generatedAssets = post.generatedAssets.filter(
+      (asset) => asset.id !== assetId,
+    );
+    const selectedVisualAssetId =
+      post.selectedVisualAssetId === assetId ? null : post.selectedVisualAssetId;
+    const visualAssetRejections = post.visualAssetRejections.filter(
+      (rejection) => rejection.assetId !== assetId,
+    );
+
+    return {
+      ...post,
+      generatedAssets,
+      selectedVisualAssetId,
+      visualStatus: resolveVisualStatus({
+        generatedAssets,
+        selectedVisualAssetId,
+        visualAssetRejections,
+      }),
+      visualApprovedAt: null,
+      finalPackageStatus: "open",
+      finalPackageReadyAt: null,
+      status: "approved",
+      visualAssetRejections,
+      visualEvents: appendVisualEvent(post, {
+        type: "asset_deleted",
+        label: "Asset apagado",
+        detail: "Um asset visual foi removido da lista deste post.",
+        assetId,
+      }),
       updatedAt: new Date().toISOString(),
     };
   });
@@ -383,7 +516,41 @@ export function approveApprovedPostVisual(
           ...post,
           visualStatus: "visual_approved",
           visualApprovedAt: new Date().toISOString(),
+          finalPackageStatus: "open" as const,
+          finalPackageReadyAt: null,
           status: "ready_to_publish" as ApprovedPostStatus,
+          visualEvents: appendVisualEvent(post, {
+            type: "visual_approved",
+            label: "Visual aprovado",
+            detail: "A composicao visual final foi aprovada.",
+            assetId: post.selectedVisualAssetId,
+            compositionId: post.selectedAssetCompositionId,
+          }),
+          updatedAt: new Date().toISOString(),
+        }
+      : post,
+  );
+}
+
+export function finalizeApprovedPostPackage(
+  posts: ApprovedPost[],
+  postId: string,
+): ApprovedPost[] {
+  return posts.map((post) =>
+    post.id === postId && post.visualStatus === "visual_approved"
+      ? {
+          ...post,
+          finalPackageStatus: "ready",
+          finalPackageReadyAt: new Date().toISOString(),
+          status: "ready_to_publish" as ApprovedPostStatus,
+          visualEvents: appendVisualEvent(post, {
+            type: "package_finalized",
+            label: "Pacote finalizado",
+            detail:
+              "O pacote final foi fechado com imagem, legenda, comentario e metadados.",
+            assetId: post.selectedVisualAssetId || undefined,
+            compositionId: post.selectedAssetCompositionId,
+          }),
           updatedAt: new Date().toISOString(),
         }
       : post,
@@ -403,11 +570,11 @@ function nextVisualStatusForAssetSelection(
   post: ApprovedPost,
   assetId: string | null,
 ): ApprovedPostVisualStatus {
-  if (assetId) {
-    return "asset_generated";
-  }
-
-  return post.generatedAssets.length ? "asset_generated" : "typographic_only";
+  return resolveVisualStatus({
+    generatedAssets: post.generatedAssets,
+    selectedVisualAssetId: assetId,
+    visualAssetRejections: post.visualAssetRejections,
+  });
 }
 
 export function createDuplicateProjectFromApprovedPost(post: ApprovedPost) {
@@ -477,6 +644,10 @@ export function buildApprovedPostText(post: ApprovedPost) {
   return [
     `Marca: ${post.brandName}`,
     `Conceito: ${view.concept.title}`,
+    `Status do pacote: ${post.finalPackageStatus === "ready" ? "pronto" : "em aberto"}`,
+    post.finalPackageReadyAt
+      ? `Finalizado em: ${new Date(post.finalPackageReadyAt).toLocaleString("pt-BR")}`
+      : "",
     "",
     "Legenda:",
     view.caption,
@@ -485,6 +656,9 @@ export function buildApprovedPostText(post: ApprovedPost) {
     view.hashtags.length ? `Hashtags:\n${view.hashtags}` : "",
     view.selectedAsset
       ? `Asset visual:\n${view.selectedAsset.prompt}`
+      : "",
+    view.selectedAsset
+      ? `Composicao visual:\n${view.selectedAssetCompositionVariant.name}`
       : "",
     post.notes ? `Notas internas:\n${post.notes}` : "",
   ]
@@ -504,6 +678,7 @@ export function buildApprovedPostSearchText(post: ApprovedPost) {
     post.brandName,
     post.notes,
     post.status,
+    post.finalPackageStatus,
     post.visualStatus,
     post.selectedAssetCompositionId,
     concept?.title,
@@ -514,6 +689,9 @@ export function buildApprovedPostSearchText(post: ApprovedPost) {
     selectedCaption?.hashtags.join(" "),
     post.generatedAssets.map((asset) => asset.prompt).join(" "),
     post.visualAssetRejections.map((rejection) => rejection.note).join(" "),
+    post.visualEvents
+      .map((event) => `${event.label} ${event.detail}`)
+      .join(" "),
   ]
     .filter(Boolean)
     .join(" ");
@@ -608,6 +786,30 @@ function normalizeVisualStatus(
     return value;
   }
 
+  return resolveVisualStatus(context);
+}
+
+function normalizeVisualAssetRejections(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isVisualAssetRejection).slice(0, 24);
+}
+
+function normalizeVisualEvents(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isApprovedPostVisualEvent).slice(0, 48);
+}
+
+function resolveVisualStatus(context: {
+  generatedAssets: GeneratedVisualAsset[];
+  selectedVisualAssetId: string | null;
+  visualAssetRejections: VisualAssetRejection[];
+}): ApprovedPostVisualStatus {
   if (context.selectedVisualAssetId) {
     return "asset_generated";
   }
@@ -623,12 +825,18 @@ function normalizeVisualStatus(
   return "typographic_only";
 }
 
-function normalizeVisualAssetRejections(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(isVisualAssetRejection).slice(0, 24);
+function appendVisualEvent(
+  post: ApprovedPost,
+  event: Omit<ApprovedPostVisualEvent, "id" | "createdAt">,
+) {
+  return [
+    {
+      id: `visual-event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      ...event,
+    },
+    ...post.visualEvents,
+  ].slice(0, 48);
 }
 
 function isGeneratedVisualAsset(value: unknown): value is GeneratedVisualAsset {
@@ -670,6 +878,43 @@ function isVisualAssetRejectionReasonId(
   value: unknown,
 ): value is VisualAssetRejectionReasonId {
   return visualAssetRejectionReasons.some((reason) => reason.id === value);
+}
+
+function isApprovedPostVisualEvent(
+  value: unknown,
+): value is ApprovedPostVisualEvent {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    isApprovedPostVisualEventType(candidate.type) &&
+    typeof candidate.label === "string" &&
+    typeof candidate.detail === "string" &&
+    typeof candidate.createdAt === "string" &&
+    (candidate.assetId === undefined || typeof candidate.assetId === "string") &&
+    (candidate.compositionId === undefined ||
+      typeof candidate.compositionId === "string")
+  );
+}
+
+function isApprovedPostVisualEventType(
+  value: unknown,
+): value is ApprovedPostVisualEventType {
+  return (
+    value === "asset_generated" ||
+    value === "asset_selected" ||
+    value === "asset_removed" ||
+    value === "composition_changed" ||
+    value === "asset_rejected" ||
+    value === "asset_restored" ||
+    value === "asset_deleted" ||
+    value === "visual_approved" ||
+    value === "package_finalized"
+  );
 }
 
 function isApprovedPost(value: unknown): value is StoredApprovedPost {
