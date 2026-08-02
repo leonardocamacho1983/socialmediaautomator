@@ -340,7 +340,7 @@ function isGeneratedVisualAsset(value: unknown): value is GeneratedVisualAsset {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.model === "string" &&
-    candidate.provider === "recraft" &&
+    typeof candidate.provider === "string" &&
     typeof candidate.prompt === "string" &&
     typeof candidate.mediaType === "string" &&
     typeof candidate.dataUrl === "string" &&

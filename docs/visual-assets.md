@@ -12,7 +12,10 @@ Included:
 - API route `/api/assets`;
 - Recraft image generation through Vercel AI Gateway;
 - default model `recraft/recraft-v4.1`;
+- fallback model `openai/gpt-image-1-mini` when the primary image provider
+  fails;
 - optional override through `VISUAL_ASSET_MODEL`;
+- optional override through `VISUAL_ASSET_FALLBACK_MODEL`;
 - asset prompt field in `/approved/[postId]`;
 - one generated asset per request, with repeated requests accumulating options;
 - generated asset options stored in the local approved post record;

@@ -9,6 +9,7 @@ import { stripEmbeddedBrandAssets } from "../../../lib/brand/profile";
 import {
   buildVisualAssetPrompt,
   createGeneratedVisualAsset,
+  DEFAULT_VISUAL_ASSET_FALLBACK_MODEL,
   DEFAULT_VISUAL_ASSET_MODEL,
 } from "../../../lib/creative/assets";
 
@@ -191,6 +192,10 @@ export async function POST(request: Request) {
   }
 
   const model = process.env.VISUAL_ASSET_MODEL || DEFAULT_VISUAL_ASSET_MODEL;
+  const fallbackModel =
+    process.env.VISUAL_ASSET_FALLBACK_MODEL ||
+    DEFAULT_VISUAL_ASSET_FALLBACK_MODEL;
+  const models = Array.from(new Set([model, fallbackModel].filter(Boolean)));
   const generationInput = {
     brandProfile: stripEmbeddedBrandAssets(parsedRequest.data.brandProfile),
     briefing: parsedRequest.data.briefing,
@@ -200,100 +205,98 @@ export async function POST(request: Request) {
   };
   const prompt = buildVisualAssetPrompt(generationInput);
 
-  try {
-    const result = await generateImage({
-      model: gateway.image(model),
-      prompt,
-      n: parsedRequest.data.count,
-      maxImagesPerCall: 1,
-      providerOptions: {
-        gateway: {
-          tags: [
-            "feature:visual-asset-generation",
-            "milestone:marco-4",
-            `model:${model}`,
-          ],
-        },
-      },
-    });
+  const failures: string[] = [];
 
-    return Response.json({
-      assets: result.images.map((image, index) =>
-        createGeneratedVisualAsset({
-          dataUrl: `data:${image.mediaType || "image/png"};base64,${image.base64}`,
-          mediaType: image.mediaType || "image/png",
-          model,
-          prompt,
-          index,
-        }),
-      ),
-      model,
-      prompt,
-      generatedAt: new Date().toISOString(),
-      warnings: result.warnings,
-    });
-  } catch (error) {
-    console.error("Visual asset generation failed", {
-      model,
-      name: error instanceof Error ? error.name : "UnknownError",
-      statusCode: APICallError.isInstance(error) ? error.statusCode : null,
-      promptChars: prompt.length,
-    });
-
-    if (APICallError.isInstance(error) && error.statusCode === 401) {
-      return Response.json(
-        {
-          code: "AI_GATEWAY_AUTH_FAILED",
-          error:
-            "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
+  for (const activeModel of models) {
+    try {
+      const result = await generateImage({
+        model: gateway.image(activeModel),
+        prompt,
+        n: parsedRequest.data.count,
+        maxImagesPerCall: 1,
+        providerOptions: {
+          gateway: {
+            tags: [
+              "feature:visual-asset-generation",
+              "milestone:marco-4",
+              `model:${activeModel}`,
+            ],
+          },
         },
-        { status: 503 },
-      );
+      });
+
+      return Response.json({
+        assets: result.images.map((image, index) =>
+          createGeneratedVisualAsset({
+            dataUrl: `data:${image.mediaType || "image/png"};base64,${image.base64}`,
+            mediaType: image.mediaType || "image/png",
+            model: activeModel,
+            prompt,
+            index,
+          }),
+        ),
+        model: activeModel,
+        prompt,
+        generatedAt: new Date().toISOString(),
+        warnings: result.warnings,
+      });
+    } catch (error) {
+      failures.push(`${activeModel}: ${publicErrorDetail(error)}`);
+      console.error("Visual asset generation failed", {
+        model: activeModel,
+        name: error instanceof Error ? error.name : "UnknownError",
+        statusCode: APICallError.isInstance(error) ? error.statusCode : null,
+        promptChars: prompt.length,
+      });
+
+      if (APICallError.isInstance(error) && error.statusCode === 401) {
+        return Response.json(
+          {
+            code: "AI_GATEWAY_AUTH_FAILED",
+            error:
+              "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
+          },
+          { status: 503 },
+        );
+      }
+
+      if (APICallError.isInstance(error) && error.statusCode === 402) {
+        return Response.json(
+          {
+            code: "AI_GATEWAY_BUDGET_EXCEEDED",
+            error:
+              "O limite de creditos do AI Gateway foi atingido. Ajuste o budget na Vercel antes de gerar novos assets.",
+          },
+          { status: 402 },
+        );
+      }
+
+      if (isGatewayAuthenticationFailure(error)) {
+        return Response.json(
+          {
+            code: "AI_GATEWAY_AUTH_FAILED",
+            error:
+              "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
+          },
+          { status: 503 },
+        );
+      }
+
+      if (NoImageGeneratedError.isInstance(error)) {
+        continue;
+      }
     }
-
-    if (APICallError.isInstance(error) && error.statusCode === 402) {
-      return Response.json(
-        {
-          code: "AI_GATEWAY_BUDGET_EXCEEDED",
-          error:
-            "O limite de creditos do AI Gateway foi atingido. Ajuste o budget na Vercel antes de gerar novos assets.",
-        },
-        { status: 402 },
-      );
-    }
-
-    if (isGatewayAuthenticationFailure(error)) {
-      return Response.json(
-        {
-          code: "AI_GATEWAY_AUTH_FAILED",
-          error:
-            "AI Gateway recusou a autenticacao. Verifique AI_GATEWAY_API_KEY no projeto Vercel.",
-        },
-        { status: 503 },
-      );
-    }
-
-    if (NoImageGeneratedError.isInstance(error)) {
-      return Response.json(
-        {
-          code: "NO_IMAGE_GENERATED",
-          error:
-            "O modelo nao devolveu uma imagem. Ajuste a direcao visual e tente novamente.",
-        },
-        { status: 502 },
-      );
-    }
-
-    return Response.json(
-      {
-        code: "VISUAL_ASSET_GENERATION_FAILED",
-        error:
-          "Nao foi possivel gerar o asset visual. Tente uma direcao mais concreta.",
-        details: publicErrorDetail(error),
-      },
-      { status: 502 },
-    );
   }
+
+  return Response.json(
+    {
+      code: "VISUAL_ASSET_GENERATION_FAILED",
+      error:
+        "Nao foi possivel gerar o asset visual. Tente uma direcao mais concreta.",
+      details: failures.join(" | ").slice(0, 1000),
+    },
+    { status: 502 },
+  );
 }
 
 function compactRouteText(value: string, maxLength: number) {

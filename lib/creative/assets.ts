@@ -3,11 +3,14 @@ import type { CreativeBriefing, CreativeConcept } from "./concepts";
 import type { TypographicPiece } from "./typographic-piece";
 
 export const DEFAULT_VISUAL_ASSET_MODEL = "recraft/recraft-v4.1";
+export const DEFAULT_VISUAL_ASSET_FALLBACK_MODEL = "openai/gpt-image-1-mini";
+
+export type VisualAssetProvider = "recraft" | "openai" | "google" | "unknown";
 
 export type GeneratedVisualAsset = {
   id: string;
   model: string;
-  provider: "recraft";
+  provider: VisualAssetProvider;
   prompt: string;
   mediaType: string;
   dataUrl: string;
@@ -78,12 +81,28 @@ export function createGeneratedVisualAsset(input: {
   return {
     id: `asset-${Date.now()}-${input.index + 1}`,
     model: input.model,
-    provider: "recraft",
+    provider: providerFromModel(input.model),
     prompt: input.prompt,
     mediaType: input.mediaType,
     dataUrl: input.dataUrl,
     generatedAt: new Date().toISOString(),
   };
+}
+
+function providerFromModel(model: string): VisualAssetProvider {
+  if (model.startsWith("recraft/")) {
+    return "recraft";
+  }
+
+  if (model.startsWith("openai/")) {
+    return "openai";
+  }
+
+  if (model.startsWith("google/")) {
+    return "google";
+  }
+
+  return "unknown";
 }
 
 function compactLines(values: string[]) {
