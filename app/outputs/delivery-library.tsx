@@ -1,7 +1,17 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- delivery previews use short-lived signed storage URLs */
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  deliveryOperationalStatusLabels,
+  getDeliveryStatus,
+  readDeliveryStatuses,
+  writeDeliveryStatus,
+  type DeliveryOperationalStatus,
+  type DeliveryStatusMap,
+} from "../../lib/storage/delivery-statuses";
 import {
   fetchStudioOutputPackages,
   outputKindLabels,
@@ -40,8 +50,13 @@ export function DeliveryLibrary() {
     useState<DeliveryFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState("Carregando entregas do storage.");
+  const [operationalStatuses, setOperationalStatuses] =
+    useState<DeliveryStatusMap>({});
 
   useEffect(() => {
+    // The operational delivery status is local because publishing is not in scope yet.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOperationalStatuses(readDeliveryStatuses());
     void loadPackages();
   }, []);
 
@@ -98,6 +113,15 @@ export function DeliveryLibrary() {
     } catch {
       setStatus("Nao foi possivel copiar automaticamente.");
     }
+  }
+
+  function updateOperationalStatus(
+    deliveryId: string,
+    nextStatus: DeliveryOperationalStatus,
+  ) {
+    setOperationalStatuses(writeDeliveryStatus(deliveryId, nextStatus));
+    setStatus(`Entrega marcada como ${deliveryOperationalStatusLabels[nextStatus]}.`);
+    window.setTimeout(() => setStatus(""), 2600);
   }
 
   return (
@@ -212,7 +236,12 @@ export function DeliveryLibrary() {
             <DeliveryPackageCard
               deliveryPackage={deliveryPackage}
               key={deliveryPackage.id}
+              operationalStatus={getDeliveryStatus(
+                operationalStatuses,
+                deliveryPackage.id,
+              )}
               onCopy={copyText}
+              onStatusChange={updateOperationalStatus}
             />
           ))}
         </section>
@@ -234,17 +263,40 @@ export function DeliveryLibrary() {
 
 function DeliveryPackageCard({
   deliveryPackage,
+  operationalStatus,
   onCopy,
+  onStatusChange,
 }: {
   deliveryPackage: StudioOutputPackage;
+  operationalStatus: DeliveryOperationalStatus;
   onCopy: (value: string, successMessage: string) => void;
+  onStatusChange: (
+    deliveryId: string,
+    nextStatus: DeliveryOperationalStatus,
+  ) => void;
 }) {
   const primaryOutputs = getPrimaryOutputs(deliveryPackage.outputs);
   const captionCopy = buildCopyBlock(deliveryPackage, "caption");
   const firstCommentCopy = buildCopyBlock(deliveryPackage, "firstComment");
+  const hashtagCopy = deliveryPackage.hashtags.join(" ").trim();
+  const finalPng = getOutputByKind(deliveryPackage.outputs, "final_post_png");
+  const finalZip = getOutputByKind(deliveryPackage.outputs, "final_package_zip");
 
   return (
     <article className="delivery-card">
+      {finalPng ? (
+        <Link
+          className="delivery-card-preview"
+          href={`/outputs/${encodeURIComponent(deliveryPackage.id)}`}
+        >
+          <img
+            alt={`Preview da entrega ${deliveryPackage.title}`}
+            height={1350}
+            src={finalPng.signedUrl}
+            width={1080}
+          />
+        </Link>
+      ) : null}
       <div className="project-card-heading">
         <span className="project-source">Entrega</span>
         {deliveryPackage.hasFinalZip ? (
@@ -255,6 +307,9 @@ function DeliveryPackageCard({
         {deliveryPackage.hasCarousel ? (
           <span className="delivery-chip">Carrossel</span>
         ) : null}
+        <span className={`delivery-chip delivery-chip-${operationalStatus}`}>
+          {deliveryOperationalStatusLabels[operationalStatus]}
+        </span>
         <h2>{deliveryPackage.title}</h2>
         <p>{deliveryPackage.brandName}</p>
       </div>
@@ -301,9 +356,25 @@ function DeliveryPackageCard({
       <div className="approved-post-actions">
         <Link
           className="primary-button"
+          href={`/outputs/${encodeURIComponent(deliveryPackage.id)}`}
+        >
+          Abrir entrega
+        </Link>
+        {finalZip ? (
+          <a
+            className="secondary-button"
+            href={finalZip.signedUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Baixar ZIP
+          </a>
+        ) : null}
+        <Link
+          className="secondary-button"
           href={`/approved/${encodeURIComponent(deliveryPackage.approvedPostId)}`}
         >
-          Abrir post
+          Retomar post
         </Link>
         <button
           className="secondary-button"
@@ -323,6 +394,34 @@ function DeliveryPackageCard({
         >
           Copiar comentário
         </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => onCopy(hashtagCopy, "Hashtags copiadas.")}
+          disabled={!hashtagCopy}
+        >
+          Copiar hashtags
+        </button>
+        <label className="delivery-status-select">
+          <span>Status</span>
+          <select
+            value={operationalStatus}
+            onChange={(event) =>
+              onStatusChange(
+                deliveryPackage.id,
+                event.target.value as DeliveryOperationalStatus,
+              )
+            }
+          >
+            {Object.entries(deliveryOperationalStatusLabels).map(
+              ([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
       </div>
 
       {deliveryPackage.outputs.length > primaryOutputs.length ? (
@@ -351,6 +450,13 @@ function DeliveryPackageCard({
       ) : null}
     </article>
   );
+}
+
+function getOutputByKind(
+  outputs: StudioOutputLink[],
+  kind: StudioOutputKind,
+) {
+  return outputs.find((output) => output.kind === kind) || null;
 }
 
 function buildDeliveryStats(packages: StudioOutputPackage[]) {

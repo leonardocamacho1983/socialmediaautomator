@@ -51,6 +51,10 @@ export type StudioOutputPackage = {
   caption: string;
   firstComment: string;
   hashtags: string[];
+  visualAssetPrompt: string;
+  visualAssetProvider: string;
+  visualAssetModel: string;
+  visualAssetGeneratedAt: string | null;
   outputCount: number;
   totalSizeBytes: number;
   savedAt: string;

@@ -23,6 +23,10 @@ Included:
 - the approved post detail page can export a clean final ZIP with README,
   final PNG, SVG source, copy files, asset prompt, metadata, and the approved
   carousel when available.
+- the approved post detail page has a visual quality gate for structural
+  issues before finalizing;
+- the approved post detail page shows the next operational step after copy,
+  visual, finalization and durable storage.
 
 Not included:
 
@@ -75,5 +79,7 @@ Then validate `/create` with a selected concept, typographic piece, and caption:
 8. Click `Baixar PNG`.
 9. Edit the caption or visual copy.
 10. Confirm the final approval is cleared.
-11. In `/approved/[postId]`, finalize the package and confirm `Baixar pacote
-    final` exports the organized ZIP.
+11. In `/approved/[postId]`, review the copy and visual quality gates.
+12. Finalize the package and confirm `Baixar pacote final` exports the
+    organized ZIP.
+13. Save to storage and confirm the next-step panel links to `/outputs/[id]`.

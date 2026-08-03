@@ -11,13 +11,19 @@ engagement automation.
 Included:
 
 - `/outputs` page;
+- `/outputs/[deliveryId]` detail page;
 - `GET /api/storage/packages`;
 - grouped final-package list by approved post;
 - signed links for saved PNG, SVG, ZIP, carousel ZIP and selected asset;
+- visual preview of the final PNG in delivery cards;
+- detail preview for final post and carousel slides;
 - search by title, brand, copy, file name and hashtag;
 - filters for ZIP final, carousel, asset and copy-ready deliveries;
-- copy buttons for caption and first comment;
+- copy buttons for caption, first comment, hashtags and asset prompt;
 - direct link back to the approved post detail;
+- action to duplicate a saved delivery into a new creative variation;
+- local operational status for manual workflow: ready, manually published or
+  archived;
 - fallback in `/approved/[postId]` to recover persisted posts from the database
   when browser storage is empty.
 
@@ -44,9 +50,15 @@ returns a compact package summary to the UI.
 3. Search by brand, title, caption, hashtag or file name.
 4. Filter by `ZIP final`, `Com carrossel`, `Com asset` and `Copy pronta`.
 5. Open the PNG and ZIP links.
-6. Copy the caption and first comment.
-7. Click `Abrir post` and confirm the detail page loads even after refreshing
+6. Copy the caption, first comment and hashtags.
+7. Open a delivery detail page and confirm the final PNG and carousel slides
+   render.
+8. Change the manual status and confirm it remains after refresh in the same
+   browser.
+9. Click `Retomar post` and confirm the detail page loads even after refreshing
    the browser.
+10. Click `Criar variação` and confirm `/create` opens from a duplicated
+    project.
 
 ## Current Limit
 
@@ -54,3 +66,7 @@ The library lists the latest 100 delivery packages based on the latest 1000
 stored output files. That is enough for the current internal workflow. If this
 becomes a daily production archive, add pagination and explicit package
 versions.
+
+The operational delivery status is intentionally browser-local for now. It is a
+manual production aid, not the future source of truth for publishing. When the
+Zernio phase starts, this should become a persisted publication/job status.

@@ -24,6 +24,9 @@ This repository currently contains:
 - Marco 7 persisted project library at `/projects`.
 - Marco 8 durable asset storage for final PNG/SVG/ZIP outputs.
 - Marco 9 delivery library at `/outputs`.
+- Delivery detail at `/outputs/[deliveryId]`, with final preview, carousel
+  previews, copy actions, status and variation workflow.
+- Visual Quality Gate inside `/approved/[postId]`.
 
 The app still does not generate Reels, automations, analytics, or publications.
 
@@ -35,7 +38,8 @@ Marco 8 stores finished creative files in a private Supabase Storage bucket and
 returns signed links through internal API routes.
 
 Marco 9 lists saved final packages, files and publication copy in a dedicated
-delivery library.
+delivery library. Delivery operational status is browser-local until publishing
+jobs are introduced.
 
 ## Local
 

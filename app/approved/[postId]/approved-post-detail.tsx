@@ -62,6 +62,10 @@ import {
   suggestFirstComment,
   type CopyQualityReport,
 } from "../../../lib/creative/copy-quality";
+import {
+  buildVisualQualityReport,
+  type VisualQualityReport,
+} from "../../../lib/creative/visual-quality";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import {
   downloadSvgAsPng,
@@ -255,6 +259,19 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   const durableOutputs = useMemo(
     () => mergeDurableOutputLinks(post?.durableOutputs || [], outputLinks),
     [outputLinks, post?.durableOutputs],
+  );
+  const visualQualityReport =
+    post && view
+      ? buildVisualQualityReport({
+          post,
+          finalSvg: view.assetSvg || view.svg,
+          copy: view.typographicPiece.copy,
+          selectedAsset: view.selectedAsset,
+          compositionId: post.selectedAssetCompositionId,
+        })
+      : null;
+  const hasDurableFinalZip = durableOutputs.some(
+    (output) => output.kind === "final_package_zip",
   );
 
   function persistPosts(nextPosts: ApprovedPost[]) {
@@ -657,6 +674,14 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     if (copyQualityReport?.blockerCount) {
       setStatus(
         "Quality Gate encontrou travas de copy. Corrija antes de finalizar.",
+      );
+      window.setTimeout(() => setStatus(""), 3600);
+      return;
+    }
+
+    if (visualQualityReport?.blockerCount) {
+      setStatus(
+        "Quality Gate visual encontrou travas. Corrija antes de finalizar.",
       );
       window.setTimeout(() => setStatus(""), 3600);
       return;
@@ -1314,7 +1339,22 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
               ? "Salvando arquivos..."
               : "Salvar no storage"}
           </button>
+          {hasDurableFinalZip ? (
+            <Link
+              className="secondary-button"
+              href={`/outputs/${encodeURIComponent(post.id)}`}
+            >
+              Abrir entrega
+            </Link>
+          ) : null}
         </div>
+
+        <FinalPackageNextStep
+          copyQualityReport={copyQualityReport}
+          hasDurableFinalZip={hasDurableFinalZip}
+          post={post}
+          visualQualityReport={visualQualityReport}
+        />
 
         <p className="approved-detail-muted">
           Finalizar aprova o visual atual e libera um ZIP organizado com README,
@@ -1362,6 +1402,10 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           )}
         </div>
       </section>
+
+      {visualQualityReport ? (
+        <VisualQualityPanel report={visualQualityReport} />
+      ) : null}
 
       {copyQualityReport ? (
         <CopyQualityPanel
@@ -1603,6 +1647,101 @@ type CarouselSlideEditorProps = {
   onSave: (changes: CarouselSlideCopyEdit) => void;
   slide: CarouselSlide;
 };
+
+function FinalPackageNextStep({
+  copyQualityReport,
+  hasDurableFinalZip,
+  post,
+  visualQualityReport,
+}: {
+  copyQualityReport: CopyQualityReport | null;
+  hasDurableFinalZip: boolean;
+  post: ApprovedPost;
+  visualQualityReport: VisualQualityReport | null;
+}) {
+  const nextStep = getFinalPackageNextStep({
+    copyQualityReport,
+    hasDurableFinalZip,
+    post,
+    visualQualityReport,
+  });
+
+  return (
+    <div className={`package-next-step package-next-step-${nextStep.status}`}>
+      <strong>{nextStep.title}</strong>
+      <p>{nextStep.body}</p>
+      {nextStep.href ? (
+        <Link className="secondary-button" href={nextStep.href}>
+          {nextStep.action}
+        </Link>
+      ) : (
+        <span>{nextStep.action}</span>
+      )}
+    </div>
+  );
+}
+
+function VisualQualityPanel({ report }: { report: VisualQualityReport }) {
+  const hasIssues = report.status === "review";
+
+  return (
+    <section className="approved-detail-card visual-quality-card">
+      <div className="asset-section-heading">
+        <div>
+          <p className="section-kicker">Quality Gate visual</p>
+          <h2>Acabamento da peça</h2>
+        </div>
+        <span
+          className={
+            hasIssues
+              ? "copy-quality-status copy-quality-status-review"
+              : "copy-quality-status copy-quality-status-ok"
+          }
+        >
+          {hasIssues ? "Revisar" : "OK"}
+        </span>
+      </div>
+
+      <div className="copy-quality-summary">
+        <strong>{report.summary}</strong>
+        <span>
+          {report.blockerCount
+            ? "Travas visuais bloqueiam a finalização do pacote."
+            : "Sem trava visual bloqueando o pacote final."}
+        </span>
+      </div>
+
+      <div className="copy-quality-grid">
+        {report.checks.map((check) => (
+          <article
+            className={
+              check.status === "ok"
+                ? "copy-quality-check copy-quality-check-ok"
+                : "copy-quality-check copy-quality-check-review"
+            }
+            key={check.id}
+          >
+            <div>
+              <span>{check.status === "ok" ? "OK" : "Revisar"}</span>
+              <strong>{check.label}</strong>
+            </div>
+            <p>{check.note}</p>
+            {check.issues.length ? (
+              <div className="copy-quality-issues">
+                {check.issues.map((issue) => (
+                  <div className="copy-quality-issue" key={issue.id}>
+                    <strong>{issue.label}</strong>
+                    <p>{issue.suggestion}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function CopyQualityPanel({
   firstCommentSuggestion,
@@ -2128,6 +2267,9 @@ async function buildDurableUploadFiles(
         assetId: view.selectedAsset.id,
         provider: view.selectedAsset.provider,
         model: view.selectedAsset.model,
+        prompt: view.selectedAsset.prompt,
+        generatedAt: view.selectedAsset.generatedAt,
+        mediaType: view.selectedAsset.mediaType,
       },
     });
   }
@@ -2630,6 +2772,62 @@ function mergeDurableOutputLinks(
       signedUrlExpiresAt: signedOutput?.signedUrlExpiresAt,
     };
   }) satisfies DurableOutputDisplay[];
+}
+
+function getFinalPackageNextStep({
+  copyQualityReport,
+  hasDurableFinalZip,
+  post,
+  visualQualityReport,
+}: {
+  copyQualityReport: CopyQualityReport | null;
+  hasDurableFinalZip: boolean;
+  post: ApprovedPost;
+  visualQualityReport: VisualQualityReport | null;
+}) {
+  if (copyQualityReport?.blockerCount) {
+    return {
+      status: "review",
+      title: "Corrigir copy antes de fechar",
+      body: "O pacote ainda tem trava editorial. Corrija a legenda, comentário ou slides marcados no Quality Gate.",
+      action: "Use o botão Corrigir copy ou edite manualmente abaixo.",
+    };
+  }
+
+  if (visualQualityReport?.blockerCount) {
+    return {
+      status: "review",
+      title: "Corrigir visual antes de fechar",
+      body: "A peça final tem uma trava estrutural, como formato inválido ou asset rejeitado.",
+      action: "Ajuste o visual e revise o gate visual.",
+    };
+  }
+
+  if (post.finalPackageStatus !== "ready") {
+    return {
+      status: "ready",
+      title: "Próximo passo: finalizar pacote",
+      body: "Copy e visual não têm travas bloqueantes. Finalize para congelar a entrega e liberar ZIP/storage.",
+      action: "Clique em Finalizar pacote.",
+    };
+  }
+
+  if (!hasDurableFinalZip) {
+    return {
+      status: "ready",
+      title: "Próximo passo: salvar no storage",
+      body: "O pacote está finalizado, mas ainda precisa de arquivo durável para aparecer completo em Entregas.",
+      action: "Clique em Salvar no storage.",
+    };
+  }
+
+  return {
+    status: "done",
+    title: "Entrega fechada",
+    body: "O pacote final já tem ZIP durável salvo. A próxima ação é revisar a entrega ou criar uma nova variação.",
+    action: "Abrir entrega",
+    href: `/outputs/${encodeURIComponent(post.id)}`,
+  };
 }
 
 function formatBytes(value: number) {

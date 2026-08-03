@@ -626,6 +626,7 @@ function buildStudioOutputPackage(
   const approvedPost = asRecord(row.project_approved_post_data);
   const summary = asRecord(row.project_summary);
   const copy = extractPackageCopy(approvedPost, summary);
+  const visualAsset = extractPackageVisualAsset(approvedPost, outputs);
   const outputKinds = new Set(outputs.map((output) => output.kind));
   const firstProjectId =
     outputs.find((output) => output.projectId)?.projectId || row.project_id;
@@ -655,6 +656,10 @@ function buildStudioOutputPackage(
     caption: copy.caption,
     firstComment: copy.firstComment,
     hashtags: copy.hashtags,
+    visualAssetPrompt: visualAsset.prompt,
+    visualAssetProvider: visualAsset.provider,
+    visualAssetModel: visualAsset.model,
+    visualAssetGeneratedAt: visualAsset.generatedAt,
     outputCount: outputs.length,
     totalSizeBytes: outputs.reduce(
       (totalSize, output) => totalSize + output.sizeBytes,
@@ -671,6 +676,42 @@ function buildStudioOutputPackage(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     ),
+  };
+}
+
+function extractPackageVisualAsset(
+  approvedPost: Record<string, unknown> | null,
+  outputs: StudioOutputLink[],
+) {
+  const selectedAssetId = safeRecordString(approvedPost, "selectedVisualAssetId");
+  const generatedAssets = Array.isArray(approvedPost?.generatedAssets)
+    ? approvedPost.generatedAssets
+        .map((asset) => asRecord(asset))
+        .filter((asset): asset is Record<string, unknown> => Boolean(asset))
+    : [];
+  const selectedAsset =
+    generatedAssets.find(
+      (asset) => safeRecordString(asset, "id") === selectedAssetId,
+    ) ||
+    generatedAssets[0] ||
+    null;
+  const selectedAssetOutput =
+    outputs.find((output) => output.kind === "selected_asset") || null;
+
+  return {
+    prompt:
+      safeRecordString(selectedAsset, "prompt") ||
+      safeRecordString(selectedAssetOutput?.metadata || null, "prompt"),
+    provider:
+      safeRecordString(selectedAsset, "provider") ||
+      safeRecordString(selectedAssetOutput?.metadata || null, "provider"),
+    model:
+      safeRecordString(selectedAsset, "model") ||
+      safeRecordString(selectedAssetOutput?.metadata || null, "model"),
+    generatedAt:
+      safeRecordString(selectedAsset, "generatedAt") ||
+      safeRecordString(selectedAssetOutput?.metadata || null, "generatedAt") ||
+      null,
   };
 }
 

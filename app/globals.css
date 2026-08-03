@@ -2359,6 +2359,21 @@ h2 {
   padding: 18px;
 }
 
+.delivery-card-preview {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.delivery-card-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
 .delivery-chip {
   width: fit-content;
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
@@ -2369,6 +2384,43 @@ h2 {
   font-weight: 850;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.delivery-chip-published {
+  border-color: color-mix(in srgb, var(--accent-warm) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent-warm) 12%, #ffffff);
+  color: #8a2f1b;
+}
+
+.delivery-chip-archived {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.delivery-status-select {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.delivery-status-select span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.delivery-status-select select {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 0 12px;
+  font-weight: 720;
+}
+
+.delivery-status-select-full {
+  width: 100%;
 }
 
 .delivery-file-grid {
@@ -2429,6 +2481,139 @@ h2 {
   text-decoration: none;
 }
 
+.delivery-detail-shell {
+  width: min(100%, 1440px);
+}
+
+.delivery-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(320px, 520px) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.delivery-preview-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 16px;
+}
+
+.delivery-preview-panel img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.delivery-operation-card {
+  align-self: stretch;
+}
+
+.delivery-action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.delivery-slide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.delivery-slide-link {
+  display: grid;
+  gap: 8px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.delivery-slide-link img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  object-fit: cover;
+}
+
+.delivery-slide-link span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.delivery-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.delivery-metadata-grid div {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.delivery-metadata-grid strong {
+  color: var(--foreground);
+  font-size: 0.88rem;
+}
+
+.delivery-metadata-grid span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.package-next-step {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 16px;
+}
+
+.package-next-step strong {
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.package-next-step p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.package-next-step span {
+  color: var(--accent-strong);
+  font-weight: 760;
+}
+
+.package-next-step-review {
+  border-color: color-mix(in srgb, var(--accent-warm) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent-warm) 8%, #ffffff);
+}
+
+.package-next-step-done {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+}
+
+.visual-quality-card {
+  border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+}
+
 @media (max-width: 520px) {
   .status-panel {
     padding: 24px;
@@ -2470,7 +2655,9 @@ h2 {
   .asset-workbench,
   .asset-card-grid,
   .copy-quality-grid,
-  .carousel-preview-grid {
+  .carousel-preview-grid,
+  .delivery-detail-hero,
+  .delivery-metadata-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2501,6 +2688,10 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .delivery-slide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .typographic-canvas-frame {
     min-height: 520px;
   }
@@ -2512,6 +2703,10 @@ h2 {
   }
 
   .brand-section {
+    grid-template-columns: 1fr;
+  }
+
+  .delivery-slide-grid {
     grid-template-columns: 1fr;
   }
 
