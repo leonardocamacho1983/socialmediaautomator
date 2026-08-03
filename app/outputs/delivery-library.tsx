@@ -3,7 +3,21 @@
 /* eslint-disable @next/next/no-img-element -- delivery previews use short-lived signed storage URLs */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import {
+  BRAND_PROFILE_STORAGE_KEY,
+  type BrandProfile,
+} from "../../lib/brand/profile";
+import {
+  APPROVED_POSTS_STORAGE_KEY,
+  createDuplicateProjectFromApprovedPost,
+  parseApprovedPosts,
+  upsertApprovedPost,
+  type ApprovedPost,
+} from "../../lib/creative/approved-posts";
+import { CREATIVE_PROJECT_STORAGE_KEY } from "../../lib/creative/concepts";
+import { fetchStudioProjectRecord } from "../../lib/persistence/studio-projects";
 import {
   deliveryOperationalStatusLabels,
   getDeliveryStatus,
@@ -44,6 +58,7 @@ const primaryOutputKinds: StudioOutputKind[] = [
 ];
 
 export function DeliveryLibrary() {
+  const router = useRouter();
   const [packages, setPackages] = useState<StudioOutputPackage[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [deliveryFilter, setDeliveryFilter] =
@@ -52,6 +67,7 @@ export function DeliveryLibrary() {
   const [status, setStatus] = useState("Carregando entregas do storage.");
   const [operationalStatuses, setOperationalStatuses] =
     useState<DeliveryStatusMap>({});
+  const [preparingVariationId, setPreparingVariationId] = useState("");
 
   useEffect(() => {
     // The operational delivery status is local because publishing is not in scope yet.
@@ -122,6 +138,67 @@ export function DeliveryLibrary() {
     setOperationalStatuses(writeDeliveryStatus(deliveryId, nextStatus));
     setStatus(`Entrega marcada como ${deliveryOperationalStatusLabels[nextStatus]}.`);
     window.setTimeout(() => setStatus(""), 2600);
+  }
+
+  async function recoverDelivery(deliveryPackage: StudioOutputPackage) {
+    setPreparingVariationId(deliveryPackage.id);
+    setStatus("Carregando post aprovado.");
+
+    try {
+      const record = await fetchStudioProjectRecord(
+        deliveryPackage.approvedPostId,
+      );
+      const approvedPost = record.approvedPostData;
+
+      if (!approvedPost) {
+        throw new Error("Post aprovado nao encontrado para esta entrega.");
+      }
+
+      saveApprovedPostLocally(approvedPost);
+      saveProjectSnapshot(
+        approvedPost.projectSnapshot.brandSnapshot,
+        approvedPost.projectSnapshot,
+      );
+      router.push(`/approved/${encodeURIComponent(approvedPost.id)}`);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel retomar esta entrega.",
+      );
+    } finally {
+      setPreparingVariationId("");
+    }
+  }
+
+  async function duplicateDelivery(deliveryPackage: StudioOutputPackage) {
+    setPreparingVariationId(deliveryPackage.id);
+    setStatus("Criando variação a partir da entrega.");
+
+    try {
+      const record = await fetchStudioProjectRecord(
+        deliveryPackage.approvedPostId,
+      );
+      const approvedPost = record.approvedPostData;
+
+      if (!approvedPost) {
+        throw new Error("Post aprovado nao encontrado para esta entrega.");
+      }
+
+      const duplicateProject = createDuplicateProjectFromApprovedPost(approvedPost);
+
+      saveApprovedPostLocally(approvedPost);
+      saveProjectSnapshot(duplicateProject.brandSnapshot, duplicateProject);
+      router.push("/create#typographic-piece");
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel criar a variação.",
+      );
+    } finally {
+      setPreparingVariationId("");
+    }
   }
 
   return (
@@ -241,7 +318,10 @@ export function DeliveryLibrary() {
                 deliveryPackage.id,
               )}
               onCopy={copyText}
+              onCreateVariation={duplicateDelivery}
+              onRecover={recoverDelivery}
               onStatusChange={updateOperationalStatus}
+              isPreparingAction={preparingVariationId === deliveryPackage.id}
             />
           ))}
         </section>
@@ -263,13 +343,19 @@ export function DeliveryLibrary() {
 
 function DeliveryPackageCard({
   deliveryPackage,
+  isPreparingAction,
   operationalStatus,
+  onCreateVariation,
   onCopy,
+  onRecover,
   onStatusChange,
 }: {
   deliveryPackage: StudioOutputPackage;
+  isPreparingAction: boolean;
   operationalStatus: DeliveryOperationalStatus;
+  onCreateVariation: (deliveryPackage: StudioOutputPackage) => void;
   onCopy: (value: string, successMessage: string) => void;
+  onRecover: (deliveryPackage: StudioOutputPackage) => void;
   onStatusChange: (
     deliveryId: string,
     nextStatus: DeliveryOperationalStatus,
@@ -370,12 +456,22 @@ function DeliveryPackageCard({
             Baixar ZIP
           </a>
         ) : null}
-        <Link
+        <button
           className="secondary-button"
-          href={`/approved/${encodeURIComponent(deliveryPackage.approvedPostId)}`}
+          type="button"
+          onClick={() => onRecover(deliveryPackage)}
+          disabled={isPreparingAction}
         >
-          Retomar post
-        </Link>
+          {isPreparingAction ? "Carregando..." : "Retomar post"}
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => onCreateVariation(deliveryPackage)}
+          disabled={isPreparingAction}
+        >
+          {isPreparingAction ? "Preparando..." : "Criar variação"}
+        </button>
         <button
           className="secondary-button"
           type="button"
@@ -449,6 +545,26 @@ function DeliveryPackageCard({
         </details>
       ) : null}
     </article>
+  );
+}
+
+function saveProjectSnapshot(brand: BrandProfile, project: unknown) {
+  window.localStorage.setItem(BRAND_PROFILE_STORAGE_KEY, JSON.stringify(brand));
+  window.localStorage.setItem(
+    CREATIVE_PROJECT_STORAGE_KEY,
+    JSON.stringify(project),
+  );
+}
+
+function saveApprovedPostLocally(approvedPost: ApprovedPost) {
+  const currentPosts = parseApprovedPosts(
+    JSON.parse(window.localStorage.getItem(APPROVED_POSTS_STORAGE_KEY) || "[]"),
+  );
+  const nextPosts = upsertApprovedPost(currentPosts, approvedPost);
+
+  window.localStorage.setItem(
+    APPROVED_POSTS_STORAGE_KEY,
+    JSON.stringify(nextPosts),
   );
 }
 
