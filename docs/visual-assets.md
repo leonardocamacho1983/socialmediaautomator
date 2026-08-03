@@ -140,12 +140,18 @@ Manual validation:
 11. Approve the final visual version or finalize the package directly.
 12. Confirm the package status becomes ready.
 13. Download the ZIP and confirm it includes:
-    - `final/post-1080x1350.png`;
-    - `copy/legenda.txt`;
-    - `copy/primeiro-comentario.txt`;
-    - `copy/hashtags.txt`;
-    - `asset/asset-prompt.txt`;
-    - `metadata.json`;
-    - `visual-history.json`.
+    - `README.md`;
+    - `01-post/post-final-1080x1350.png`;
+    - `01-post/post-final.svg`;
+    - `02-copy/legenda.txt`;
+    - `02-copy/primeiro-comentario.txt`;
+    - `02-copy/hashtags.txt`;
+    - `02-copy/post-completo.txt`;
+    - `02-copy/pacote-copy.md`;
+    - `04-assets/asset-prompt.txt`;
+    - `04-assets/selected-asset.png`, when a visual asset is selected;
+    - `05-metadata/manifest.json`;
+    - `05-metadata/post.json`;
+    - `05-metadata/visual-history.json`.
 14. Confirm `/approved` shows visual and package status.
 15. Download the PNG and confirm it is 1080x1350.

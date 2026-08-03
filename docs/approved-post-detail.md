@@ -28,7 +28,9 @@ Included:
 - approve the final visual version explicitly or through package finalization;
 - delete generated assets;
 - finalize the post package;
-- download a ZIP with final PNG, copy, metadata, and visual history;
+- download a clean final ZIP with README, final PNG, SVG source, copy files,
+  asset prompt, metadata, visual history, and the approved carousel when
+  available;
 - show the visual event history.
 - generate a six-slide 1080x1350 carousel package;
 - preview each carousel slide in the detail page;
@@ -103,8 +105,19 @@ Manual validation:
    approval.
 10. Finalize the package and confirm the current visual is approved
     automatically if it was not approved before.
-11. Download the ZIP and confirm it includes final image, copy files, metadata,
-    and visual history.
+11. Download the final package and confirm it includes:
+    - `README.md`;
+    - `01-post/post-final-1080x1350.png`;
+    - `01-post/post-final.svg`;
+    - `02-copy/legenda.txt`;
+    - `02-copy/primeiro-comentario.txt`;
+    - `02-copy/hashtags.txt`;
+    - `02-copy/post-completo.txt`;
+    - `02-copy/pacote-copy.md`;
+    - `04-assets/asset-prompt.txt`;
+    - `05-metadata/manifest.json`;
+    - `05-metadata/post.json`;
+    - `05-metadata/visual-history.json`.
 12. Generate the carousel and confirm six slide previews appear.
 13. Download the carousel ZIP and confirm it includes six PNG slides, copy,
     script, and metadata.

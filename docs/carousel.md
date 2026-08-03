@@ -39,6 +39,8 @@ Included:
   issues;
 - ZIP export with six PNGs, caption, first comment, hashtags, script, and
   metadata, only after carousel approval;
+- inclusion in the final post ZIP when the carousel is approved before the
+  final package is downloaded;
 - delete, regenerate, approve, and export controls;
 - local carousel event history.
 

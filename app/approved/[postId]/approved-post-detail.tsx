@@ -285,7 +285,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       return;
     }
 
-    setStatus("Montando ZIP...");
+    setStatus("Montando pacote final...");
 
     try {
       const exportSvg = view.assetSvg || view.svg;
@@ -293,49 +293,99 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}`;
       const files: ZipDownloadFile[] = [
         {
-          name: "final/post-1080x1350.png",
+          name: "01-post/post-final-1080x1350.png",
           content: pngBlob,
         },
         {
-          name: "copy/legenda.txt",
+          name: "01-post/post-final.svg",
+          content: exportSvg,
+        },
+        {
+          name: "02-copy/legenda.txt",
           content: view.caption,
         },
         {
-          name: "copy/primeiro-comentario.txt",
+          name: "02-copy/primeiro-comentario.txt",
           content: view.firstComment || "",
         },
         {
-          name: "copy/hashtags.txt",
+          name: "02-copy/hashtags.txt",
           content: view.hashtags || "",
         },
         {
-          name: "asset/asset-prompt.txt",
+          name: "02-copy/post-completo.txt",
+          content: buildReadyToPublishCopy(view),
+        },
+        {
+          name: "02-copy/pacote-copy.md",
+          content: buildCopyPackageMarkdown(post, view),
+        },
+        {
+          name: "04-assets/asset-prompt.txt",
           content: view.selectedAsset?.prompt || "Sem asset visual selecionado.",
         },
         {
-          name: "metadata.json",
+          name: "05-metadata/post.json",
           content: JSON.stringify(buildFinalPackageMetadata(post, view), null, 2),
         },
         {
-          name: "visual-history.json",
+          name: "05-metadata/visual-history.json",
           content: JSON.stringify(post.visualEvents, null, 2),
         },
         {
-          name: "README.txt",
-          content: buildFinalPackageReadme(post),
+          name: "05-metadata/carousel-history.json",
+          content: JSON.stringify(post.carouselEvents, null, 2),
         },
       ];
 
       if (view.selectedAsset?.dataUrl) {
         files.push({
-          name: "asset/selected-asset.png",
+          name: "04-assets/selected-asset.png",
           content: dataUrlToBlob(view.selectedAsset.dataUrl),
+        });
+      } else {
+        files.push({
+          name: "04-assets/README.md",
+          content:
+            "Este pacote usa apenas a composicao tipografica renderizada pelo sistema. Nao ha asset visual separado.",
         });
       }
 
+      const carouselIncluded = await appendFinalPackageCarouselFiles(
+        files,
+        post,
+        view,
+      );
+      const readmeName = "README.md";
+      const manifestName = "05-metadata/manifest.json";
+      const packageFileNames = [
+        readmeName,
+        ...files.map((file) => file.name),
+        manifestName,
+      ];
+
+      files.unshift({
+        name: readmeName,
+        content: buildFinalPackageReadme(post, view, {
+          carouselIncluded,
+          fileNames: packageFileNames,
+        }),
+      });
+      files.push({
+        name: manifestName,
+        content: JSON.stringify(
+          buildFinalPackageManifest(post, view, {
+            carouselIncluded,
+            fileNames: packageFileNames,
+          }),
+          null,
+          2,
+        ),
+      });
+
       await downloadZipFile(files, `${baseFileName}-pacote-final.zip`);
       persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
-      setStatus("ZIP exportado.");
+      setStatus("Pacote final exportado.");
       window.setTimeout(() => setStatus(""), 2600);
     } catch {
       setStatus("Nao foi possivel baixar o pacote final.");
@@ -1128,6 +1178,14 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             <span>{view?.firstComment ? "Incluído" : "Vazio"}</span>
           </div>
           <div>
+            <strong>Carrossel</strong>
+            <span>
+              {post.carouselStatus === "approved" && post.carouselPackage
+                ? `${post.carouselPackage.slides.length} slides incluídos`
+                : "Não incluído"}
+            </span>
+          </div>
+          <div>
             <strong>Histórico</strong>
             <span>
               {post.visualEvents.length === 1
@@ -1154,14 +1212,15 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             onClick={downloadFinalPackage}
             disabled={!view || post.finalPackageStatus !== "ready"}
           >
-            Baixar ZIP
+            Baixar pacote final
           </button>
         </div>
 
         <p className="approved-detail-muted">
-          Finalizar aprova o visual atual e libera o ZIP com PNG final
-          1080x1350, legenda, primeiro comentário, hashtags, prompt do asset,
-          metadados e histórico visual.
+          Finalizar aprova o visual atual e libera um ZIP organizado com README,
+          PNG final 1080x1350, SVG fonte, legenda, primeiro comentário,
+          hashtags, pacote de copy, prompt do asset, metadados e carrossel
+          aprovado quando houver.
         </p>
       </section>
 
@@ -1774,6 +1833,110 @@ function saveProjectSnapshot(
   );
 }
 
+type FinalPackageFileManifestOptions = {
+  carouselIncluded: boolean;
+  fileNames: string[];
+};
+
+async function appendFinalPackageCarouselFiles(
+  files: ZipDownloadFile[],
+  post: ApprovedPost,
+  view: ApprovedPostView,
+) {
+  if (!post.carouselPackage || post.carouselStatus !== "approved") {
+    files.push({
+      name: "03-carrossel/README.md",
+      content: [
+        "# Carrossel",
+        "",
+        "Nenhum carrossel aprovado foi incluido neste pacote.",
+        "",
+        post.carouselPackage
+          ? "Existe um carrossel em revisao. Aprove o carrossel antes de baixar o pacote final se quiser incluir os slides."
+          : "Gere e aprove um carrossel antes de baixar o pacote final se quiser incluir os slides.",
+      ].join("\n"),
+    });
+
+    return false;
+  }
+
+  for (const slide of post.carouselPackage.slides) {
+    const slideNumber = String(slide.index).padStart(2, "0");
+    const svg = renderCarouselSlideSvg(post.carouselPackage, slide, view.brand);
+    const pngBlob = await svgToPngBlob(svg);
+
+    files.push(
+      {
+        name: `03-carrossel/slides/slide-${slideNumber}.png`,
+        content: pngBlob,
+      },
+      {
+        name: `03-carrossel/source/slide-${slideNumber}.svg`,
+        content: svg,
+      },
+    );
+  }
+
+  files.push(
+    {
+      name: "03-carrossel/roteiro.md",
+      content: buildCarouselScript(post),
+    },
+    {
+      name: "03-carrossel/metadata.json",
+      content: JSON.stringify(
+        {
+          status: post.carouselStatus,
+          approvedAt: post.carouselApprovedAt,
+          package: post.carouselPackage,
+        },
+        null,
+        2,
+      ),
+    },
+  );
+
+  return true;
+}
+
+function buildReadyToPublishCopy(view: ApprovedPostView) {
+  return [
+    view.caption,
+    view.firstComment ? `Primeiro comentario:\n${view.firstComment}` : "",
+    view.hashtags ? `Hashtags:\n${view.hashtags}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildCopyPackageMarkdown(post: ApprovedPost, view: ApprovedPostView) {
+  return [
+    `# Copy do post - ${post.title}`,
+    "",
+    "## Legenda",
+    "",
+    view.caption || "Sem legenda.",
+    "",
+    "## Primeiro comentario",
+    "",
+    view.firstComment || "Sem primeiro comentario.",
+    "",
+    "## Hashtags",
+    "",
+    view.hashtags || "Sem hashtags.",
+    "",
+    "## Copy visual",
+    "",
+    `Headline: ${view.typographicPiece.copy.headline}`,
+    view.typographicPiece.copy.support
+      ? `Apoio: ${view.typographicPiece.copy.support}`
+      : "",
+    view.typographicPiece.copy.cta ? `CTA: ${view.typographicPiece.copy.cta}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function buildFinalPackageMetadata(
   post: ApprovedPost,
   view: ApprovedPostView,
@@ -1823,13 +1986,66 @@ function buildFinalPackageMetadata(
           layoutFamily: view.selectedAssetCompositionVariant.layoutFamily,
         }
       : null,
+    carousel: post.carouselPackage
+      ? {
+          status: post.carouselStatus,
+          approvedAt: post.carouselApprovedAt,
+          packageId: post.carouselPackage.id,
+          renderer: post.carouselPackage.renderer,
+          slideCount: post.carouselPackage.slides.length,
+        }
+      : null,
     notes: post.notes,
   };
 }
 
-function buildFinalPackageReadme(post: ApprovedPost) {
+function buildFinalPackageManifest(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+  options: FinalPackageFileManifestOptions,
+) {
+  return {
+    packageType: "social-studio-final-post-package",
+    packageVersion: 2,
+    exportedAt: new Date().toISOString(),
+    postId: post.id,
+    title: post.title,
+    brandName: post.brandName,
+    finalPackageStatus: post.finalPackageStatus,
+    finalPackageReadyAt: post.finalPackageReadyAt,
+    includes: {
+      finalPostPng: true,
+      finalPostSvg: true,
+      copy: true,
+      selectedAsset: Boolean(view.selectedAsset?.dataUrl),
+      approvedCarousel: options.carouselIncluded,
+      metadata: true,
+    },
+    copy: {
+      captionIncluded: Boolean(view.caption),
+      firstCommentIncluded: Boolean(view.firstComment),
+      hashtagCount: view.captionVariant.hashtags.length,
+    },
+    carousel: {
+      status: post.carouselStatus,
+      included: options.carouselIncluded,
+      slideCount:
+        options.carouselIncluded && post.carouselPackage
+          ? post.carouselPackage.slides.length
+          : 0,
+      approvedAt: post.carouselApprovedAt,
+    },
+    files: options.fileNames,
+  };
+}
+
+function buildFinalPackageReadme(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+  options: FinalPackageFileManifestOptions,
+) {
   return [
-    "Pacote final de post",
+    `# Pacote final - ${post.title}`,
     "",
     `Titulo: ${post.title}`,
     `Marca: ${post.brandName}`,
@@ -1838,15 +2054,29 @@ function buildFinalPackageReadme(post: ApprovedPost) {
       ? `Finalizado em: ${new Date(post.finalPackageReadyAt).toLocaleString("pt-BR")}`
       : "",
     "",
-    "Arquivos:",
-    "- final/post-1080x1350.png",
-    "- copy/legenda.txt",
-    "- copy/primeiro-comentario.txt",
-    "- copy/hashtags.txt",
-    "- asset/asset-prompt.txt",
-    "- asset/selected-asset.png, quando houver asset selecionado",
-    "- metadata.json",
-    "- visual-history.json",
+    "## Como usar",
+    "",
+    "1. Use `01-post/post-final-1080x1350.png` como imagem principal do post.",
+    "2. Use `02-copy/legenda.txt`, `02-copy/primeiro-comentario.txt` e `02-copy/hashtags.txt` para publicacao.",
+    "3. Se o carrossel estiver incluido, use os PNGs em `03-carrossel/slides/` na ordem numerica.",
+    "4. Consulte `05-metadata/manifest.json` para ver tudo que foi incluido.",
+    "",
+    "## Conteudo incluido",
+    "",
+    "- Post final em PNG 1080x1350.",
+    "- SVG fonte do post final.",
+    "- Legenda, primeiro comentario, hashtags e pacote de copy consolidado.",
+    options.carouselIncluded
+      ? `- Carrossel aprovado com ${post.carouselPackage?.slides.length || 0} slides em PNG e SVG.`
+      : "- Carrossel nao incluido porque ainda nao existe carrossel aprovado.",
+    view.selectedAsset
+      ? "- Asset visual selecionado e prompt do asset."
+      : "- Sem asset visual separado; a entrega usa apenas a composicao final.",
+    "- Metadados, historico visual e historico do carrossel.",
+    "",
+    "## Arquivos",
+    "",
+    ...options.fileNames.map((fileName) => `- ${fileName}`),
   ]
     .filter(Boolean)
     .join("\n");

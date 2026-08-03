@@ -20,6 +20,9 @@ Included:
   hashtags, or review changes;
 - exports the selected image as PNG;
 - copies the caption, first comment, or full post package to the clipboard.
+- the approved post detail page can export a clean final ZIP with README,
+  final PNG, SVG source, copy files, asset prompt, metadata, and the approved
+  carousel when available.
 
 Not included:
 
@@ -72,3 +75,5 @@ Then validate `/create` with a selected concept, typographic piece, and caption:
 8. Click `Baixar PNG`.
 9. Edit the caption or visual copy.
 10. Confirm the final approval is cleared.
+11. In `/approved/[postId]`, finalize the package and confirm `Baixar pacote
+    final` exports the organized ZIP.
