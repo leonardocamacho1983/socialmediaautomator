@@ -77,10 +77,14 @@ import {
   syncStudioProjectRecord,
 } from "../../../lib/persistence/studio-projects";
 import {
+  DIRECT_STUDIO_UPLOAD_MIN_BYTES,
+  dedupeStudioOutputs,
   fetchStudioOutputs,
+  getStudioOutputStableKey,
   outputKindLabels,
   stripSignedOutputFields,
   uploadStudioOutput,
+  uploadStudioOutputBlob,
   type StudioOutputLink,
   type StudioOutputRecord,
   type StudioOutputKind,
@@ -409,44 +413,89 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     setIsSavingDurableOutputs(true);
     setStorageStatus("Preparando arquivos duraveis...");
 
+    const savedOutputs: StudioOutputLink[] = [];
+    let baseOutputLinks = outputLinks;
+
     try {
       const files = await buildDurableUploadFiles(post, view);
-      const savedOutputs: StudioOutputLink[] = [];
+      const remoteOutputs = await fetchStudioOutputs(post.id).catch(() => []);
 
-      for (const [index, file] of files.entries()) {
+      if (remoteOutputs.length) {
+        baseOutputLinks = mergeStudioOutputLinks(outputLinks, remoteOutputs);
+        setOutputLinks(baseOutputLinks);
+        persistPosts(
+          appendApprovedPostDurableOutputs(
+            posts,
+            post.id,
+            baseOutputLinks.map(stripSignedOutputFields),
+          ),
+        );
+      }
+
+      const existingOutputKeys = new Set(
+        baseOutputLinks.map(getStudioOutputStableKey),
+      );
+      const pendingFiles = files.filter(
+        (file) => !existingOutputKeys.has(getDurableUploadFileStableKey(file)),
+      );
+
+      if (!pendingFiles.length) {
+        setStorageStatus("Todos os arquivos deste pacote ja estavam salvos.");
+        return;
+      }
+
+      for (const [index, file] of pendingFiles.entries()) {
         setStorageStatus(
-          `Salvando ${index + 1}/${files.length}: ${file.label}.`,
+          `Salvando ${index + 1}/${pendingFiles.length}: ${file.label}.`,
         );
         const blob =
           typeof file.content === "string"
             ? new Blob([file.content], { type: file.contentType })
             : file.content;
-        const output = await uploadStudioOutput({
-          approvedPostId: post.id,
-          projectId: post.projectSnapshot.id,
-          kind: file.kind,
-          label: file.label,
-          fileName: file.fileName,
-          contentType: file.contentType,
-          dataBase64: await blobToBase64(blob),
-          metadata: file.metadata,
-        });
+        const output = await uploadDurableOutputFile(post, file, blob);
 
         savedOutputs.push(output);
       }
 
-      setOutputLinks((currentOutputs) =>
-        mergeStudioOutputLinks(currentOutputs, savedOutputs),
+      const nextOutputLinks = mergeStudioOutputLinks(
+        baseOutputLinks,
+        savedOutputs,
       );
+      const skippedCount = files.length - pendingFiles.length;
+
+      setOutputLinks(nextOutputLinks);
       persistPosts(
         appendApprovedPostDurableOutputs(
           posts,
           post.id,
-          savedOutputs.map(stripSignedOutputFields),
+          nextOutputLinks.map(stripSignedOutputFields),
         ),
       );
-      setStorageStatus(`${savedOutputs.length} arquivo(s) salvo(s) no storage.`);
+      setStorageStatus(
+        [
+          `${savedOutputs.length} arquivo(s) salvo(s) no storage.`,
+          skippedCount ? `${skippedCount} arquivo(s) ja existiam.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
     } catch (error) {
+      if (savedOutputs.length) {
+        const partialOutputLinks = mergeStudioOutputLinks(
+          baseOutputLinks,
+          savedOutputs,
+        );
+
+        setOutputLinks(partialOutputLinks);
+        persistPosts(
+          appendApprovedPostDurableOutputs(
+            posts,
+            post.id,
+            partialOutputLinks.map(stripSignedOutputFields),
+          ),
+        );
+      }
+
       setStorageStatus(
         error instanceof Error
           ? error.message
@@ -2154,6 +2203,51 @@ async function buildDurableUploadFiles(
   return uploadFiles;
 }
 
+async function uploadDurableOutputFile(
+  approvedPost: ApprovedPost,
+  file: DurableUploadFile,
+  blob: Blob,
+) {
+  if (shouldUseDirectStudioUpload(file, blob)) {
+    return uploadStudioOutputBlob({
+      approvedPostId: approvedPost.id,
+      projectId: approvedPost.projectSnapshot.id,
+      kind: file.kind,
+      label: file.label,
+      fileName: file.fileName,
+      contentType: file.contentType,
+      content: blob,
+      metadata: file.metadata,
+    });
+  }
+
+  return uploadStudioOutput({
+    approvedPostId: approvedPost.id,
+    projectId: approvedPost.projectSnapshot.id,
+    kind: file.kind,
+    label: file.label,
+    fileName: file.fileName,
+    contentType: file.contentType,
+    dataBase64: await blobToBase64(blob),
+    metadata: file.metadata,
+  });
+}
+
+function shouldUseDirectStudioUpload(file: DurableUploadFile, blob: Blob) {
+  return (
+    file.kind === "final_package_zip" ||
+    blob.size >= DIRECT_STUDIO_UPLOAD_MIN_BYTES
+  );
+}
+
+function getDurableUploadFileStableKey(file: DurableUploadFile) {
+  return getStudioOutputStableKey({
+    kind: file.kind,
+    fileName: file.fileName,
+    metadata: file.metadata,
+  });
+}
+
 async function buildCarouselZipFiles(
   post: ApprovedPost,
   view: ApprovedPostView,
@@ -2505,30 +2599,37 @@ function mergeStudioOutputLinks(
   currentOutputs: StudioOutputLink[],
   nextOutputs: StudioOutputLink[],
 ) {
-  const outputsByPath = new Map<string, StudioOutputLink>();
-
-  for (const output of [...currentOutputs, ...nextOutputs]) {
-    outputsByPath.set(output.objectPath, output);
-  }
-
-  return [...outputsByPath.values()].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  return dedupeStudioOutputs([...currentOutputs, ...nextOutputs]);
 }
 
 function mergeDurableOutputLinks(
   durableOutputs: StudioOutputRecord[],
   signedOutputs: StudioOutputLink[],
 ) {
+  const signedByStableKey = new Map(
+    dedupeStudioOutputs(signedOutputs).map((output) => [
+      getStudioOutputStableKey(output),
+      output,
+    ]),
+  );
   const signedByPath = new Map(
     signedOutputs.map((output) => [output.objectPath, output]),
   );
 
-  return durableOutputs.map((output) => ({
-    ...output,
-    signedUrl: signedByPath.get(output.objectPath)?.signedUrl,
-    signedUrlExpiresAt: signedByPath.get(output.objectPath)?.signedUrlExpiresAt,
-  })) satisfies DurableOutputDisplay[];
+  return dedupeStudioOutputs([
+    ...durableOutputs,
+    ...signedOutputs.map(stripSignedOutputFields),
+  ]).map((output) => {
+    const signedOutput =
+      signedByPath.get(output.objectPath) ||
+      signedByStableKey.get(getStudioOutputStableKey(output));
+
+    return {
+      ...output,
+      signedUrl: signedOutput?.signedUrl,
+      signedUrlExpiresAt: signedOutput?.signedUrlExpiresAt,
+    };
+  }) satisfies DurableOutputDisplay[];
 }
 
 function formatBytes(value: number) {

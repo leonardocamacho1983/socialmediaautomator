@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import postgres from "postgres";
 import {
+  dedupeStudioOutputs,
   normalizeStudioOutputRecord,
   STUDIO_ASSET_BUCKET,
   type StudioOutputKind,
   type StudioOutputLink,
   type StudioOutputPackage,
   type StudioOutputRecord,
+  type StudioOutputSignedUploadTarget,
 } from "./studio-outputs";
 
 type StudioOutputRow = {
@@ -36,6 +38,13 @@ type UploadStudioOutputInput = {
   contentType: string;
   body: Buffer;
   metadata: Record<string, unknown>;
+};
+
+type CreateStudioOutputSignedUploadInput = Omit<
+  UploadStudioOutputInput,
+  "body"
+> & {
+  sizeBytes: number;
 };
 
 type StudioOutputPackageRow = StudioOutputRow & {
@@ -88,9 +97,11 @@ export async function listStudioOutputs(approvedPostId: string) {
     limit 200
   `;
 
-  const records = rows
-    .map(rowToStudioOutputRecord)
-    .filter((record): record is StudioOutputRecord => Boolean(record));
+  const records = dedupeStudioOutputs(
+    rows
+      .map(rowToStudioOutputRecord)
+      .filter((record): record is StudioOutputRecord => Boolean(record)),
+  );
 
   return Promise.all(records.map(withSignedUrl));
 }
@@ -162,8 +173,9 @@ export async function listStudioOutputPackages() {
 
   const packages = await Promise.all(
     [...packageRows.values()].map(async (packageRow) => {
+      const dedupedOutputs = dedupeStudioOutputs(packageRow.outputs);
       const signedOutputs = await Promise.all(
-        packageRow.outputs.map(withSignedUrl),
+        dedupedOutputs.map(withSignedUrl),
       );
 
       return buildStudioOutputPackage(packageRow.anchorRow, signedOutputs);
@@ -185,11 +197,7 @@ export async function uploadStudioOutputFile(input: UploadStudioOutputInput) {
   const bucketId = STUDIO_ASSET_BUCKET;
   const outputId = `output-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const fileName = sanitizeFileName(input.fileName);
-  const objectPath = [
-    sanitizePathSegment(input.approvedPostId),
-    input.kind,
-    `${Date.now()}-${randomUUID().slice(0, 8)}-${fileName}`,
-  ].join("/");
+  const objectPath = buildOutputObjectPath(input.approvedPostId, input.kind, fileName);
   const supabase = createClient(config.url, config.serviceKey, {
     auth: {
       autoRefreshToken: false,
@@ -277,6 +285,136 @@ export async function uploadStudioOutputFile(input: UploadStudioOutputInput) {
   return withSignedUrl(record);
 }
 
+export async function createStudioOutputSignedUploadTarget(
+  input: CreateStudioOutputSignedUploadInput,
+): Promise<StudioOutputSignedUploadTarget> {
+  const config = getRequiredSupabaseConfig();
+  const publicConfig = getRequiredSupabasePublicConfig();
+  await ensureStudioOutputSchema();
+
+  const bucketId = STUDIO_ASSET_BUCKET;
+  const outputId = `output-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const fileName = sanitizeFileName(input.fileName);
+  const objectPath = buildOutputObjectPath(input.approvedPostId, input.kind, fileName);
+  const createdAt = new Date().toISOString();
+  const supabase = createClient(config.url, config.serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  const signedResult = await supabase.storage
+    .from(bucketId)
+    .createSignedUploadUrl(objectPath, {
+      upsert: true,
+    });
+
+  if (
+    signedResult.error ||
+    !signedResult.data?.signedUrl ||
+    !signedResult.data?.token
+  ) {
+    throw new Error(
+      signedResult.error?.message ||
+        "Nao foi possivel preparar o upload assinado.",
+    );
+  }
+
+  return {
+    id: outputId,
+    approvedPostId: input.approvedPostId,
+    projectId: input.projectId,
+    kind: input.kind,
+    label: input.label,
+    fileName,
+    bucketId,
+    objectPath,
+    contentType: input.contentType,
+    sizeBytes: input.sizeBytes,
+    metadata: input.metadata,
+    createdAt,
+    updatedAt: createdAt,
+    deletedAt: null,
+    token: signedResult.data.token,
+    signedUploadUrl: signedResult.data.signedUrl,
+    supabaseUrl: publicConfig.url,
+    supabaseKey: publicConfig.key,
+  };
+}
+
+export async function completeStudioOutputSignedUpload(
+  upload: StudioOutputRecord,
+) {
+  const sql = getSqlClient();
+  await ensureStudioOutputSchema();
+
+  const rows = await sql<StudioOutputRow[]>`
+    insert into public.studio_asset_outputs (
+      id,
+      approved_post_id,
+      project_id,
+      kind,
+      label,
+      file_name,
+      bucket_id,
+      object_path,
+      content_type,
+      size_bytes,
+      metadata,
+      created_at,
+      updated_at,
+      deleted_at
+    )
+    values (
+      ${upload.id},
+      ${upload.approvedPostId},
+      ${upload.projectId},
+      ${upload.kind},
+      ${upload.label},
+      ${sanitizeFileName(upload.fileName)},
+      ${upload.bucketId || STUDIO_ASSET_BUCKET},
+      ${upload.objectPath},
+      ${upload.contentType},
+      ${upload.sizeBytes},
+      ${sql.json(toSqlJson(upload.metadata))},
+      now(),
+      now(),
+      null
+    )
+    on conflict (object_path) do update set
+      label = excluded.label,
+      file_name = excluded.file_name,
+      content_type = excluded.content_type,
+      size_bytes = excluded.size_bytes,
+      metadata = excluded.metadata,
+      updated_at = now(),
+      deleted_at = null
+    returning
+      id,
+      approved_post_id,
+      project_id,
+      kind,
+      label,
+      file_name,
+      bucket_id,
+      object_path,
+      content_type,
+      size_bytes,
+      metadata,
+      created_at,
+      updated_at,
+      deleted_at
+  `;
+
+  const record = rowToStudioOutputRecord(rows[0]);
+
+  if (!record) {
+    throw new Error("Upload concluido retornou vazio.");
+  }
+
+  return withSignedUrl(record);
+}
+
 async function withSignedUrl(
   output: StudioOutputRecord,
 ): Promise<StudioOutputLink> {
@@ -344,6 +482,16 @@ function getRequiredSupabaseConfig() {
   return config;
 }
 
+function getRequiredSupabasePublicConfig() {
+  const config = getSupabasePublicConfig();
+
+  if (!config) {
+    throw new Error("Supabase Storage publico nao configurado.");
+  }
+
+  return config;
+}
+
 function getSupabaseConfig() {
   const url = cleanEnv(
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -359,6 +507,27 @@ function getSupabaseConfig() {
   return {
     url,
     serviceKey,
+  };
+}
+
+function getSupabasePublicConfig() {
+  const url = cleanEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+  );
+  const key = cleanEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_ANON_KEY,
+  );
+
+  if (!url || !key) {
+    return null;
+  }
+
+  return {
+    url,
+    key,
   };
 }
 
@@ -551,6 +720,18 @@ function sanitizePathSegment(value: string) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 80) || "post"
   );
+}
+
+function buildOutputObjectPath(
+  approvedPostId: string,
+  kind: StudioOutputKind,
+  fileName: string,
+) {
+  return [
+    sanitizePathSegment(approvedPostId),
+    kind,
+    `${Date.now()}-${randomUUID().slice(0, 8)}-${fileName}`,
+  ].join("/");
 }
 
 function sanitizeFileName(value: string) {

@@ -1,6 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
+
 export const STUDIO_OUTPUTS_API_PATH = "/api/storage/outputs";
 export const STUDIO_OUTPUT_PACKAGES_API_PATH = "/api/storage/packages";
+export const STUDIO_SIGNED_UPLOADS_API_PATH = "/api/storage/signed-uploads";
 export const STUDIO_ASSET_BUCKET = "studio-assets";
+export const DIRECT_STUDIO_UPLOAD_MIN_BYTES = 2_500_000;
 
 export type StudioOutputKind =
   | "generated_asset"
@@ -69,7 +73,43 @@ export type StudioOutputUploadInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type StudioOutputBlobUploadInput = Omit<
+  StudioOutputUploadInput,
+  "dataBase64"
+> & {
+  content: Blob;
+};
+
+export type StudioOutputSignedUploadTarget = StudioOutputRecord & {
+  token: string;
+  signedUploadUrl: string;
+  supabaseUrl: string;
+  supabaseKey: string;
+};
+
 export type StudioOutputUploadResponse =
+  | {
+      ok: true;
+      output: StudioOutputLink;
+    }
+  | {
+      ok: false;
+      error: string;
+      code?: string;
+    };
+
+export type StudioOutputSignedUploadCreateResponse =
+  | {
+      ok: true;
+      upload: StudioOutputSignedUploadTarget;
+    }
+  | {
+      ok: false;
+      error: string;
+      code?: string;
+    };
+
+export type StudioOutputSignedUploadCompleteResponse =
   | {
       ok: true;
       output: StudioOutputLink;
@@ -119,6 +159,90 @@ export async function uploadStudioOutput(input: StudioOutputUploadInput) {
 
   if (!response.ok || !payload.ok) {
     throw new Error(payload.ok ? "Falha ao salvar arquivo." : payload.error);
+  }
+
+  return payload.output;
+}
+
+export async function uploadStudioOutputBlob(
+  input: StudioOutputBlobUploadInput,
+) {
+  const upload = await createStudioOutputSignedUpload(input);
+  const supabase = createClient(upload.supabaseUrl, upload.supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  const uploadResult = await supabase.storage
+    .from(upload.bucketId)
+    .uploadToSignedUrl(upload.objectPath, upload.token, input.content, {
+      contentType: input.contentType,
+    });
+
+  if (uploadResult.error) {
+    throw new Error(uploadResult.error.message);
+  }
+
+  return completeStudioOutputSignedUpload(upload);
+}
+
+async function createStudioOutputSignedUpload(
+  input: StudioOutputBlobUploadInput,
+) {
+  const response = await fetch(STUDIO_SIGNED_UPLOADS_API_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      action: "create",
+      approvedPostId: input.approvedPostId,
+      projectId: input.projectId || null,
+      kind: input.kind,
+      label: input.label,
+      fileName: input.fileName,
+      contentType: input.contentType,
+      sizeBytes: input.content.size,
+      metadata: input.metadata || {},
+    }),
+  });
+  const payload: StudioOutputSignedUploadCreateResponse = await response
+    .json()
+    .catch(() => ({
+      ok: false,
+      error: "Resposta invalida ao preparar upload.",
+    }));
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Falha ao preparar upload." : payload.error);
+  }
+
+  return payload.upload;
+}
+
+async function completeStudioOutputSignedUpload(
+  upload: StudioOutputSignedUploadTarget,
+) {
+  const response = await fetch(STUDIO_SIGNED_UPLOADS_API_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      action: "complete",
+      upload: stripSignedUploadFields(upload),
+    }),
+  });
+  const payload: StudioOutputSignedUploadCompleteResponse = await response
+    .json()
+    .catch(() => ({
+      ok: false,
+      error: "Resposta invalida ao concluir upload.",
+    }));
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Falha ao concluir upload." : payload.error);
   }
 
   return payload.output;
@@ -184,6 +308,12 @@ export function stripSignedOutputFields(
   };
 }
 
+function stripSignedUploadFields(
+  upload: StudioOutputSignedUploadTarget,
+): StudioOutputRecord {
+  return stripSignedOutputFields(upload);
+}
+
 export function normalizeStudioOutputRecord(value: unknown) {
   if (!value || typeof value !== "object") {
     return null;
@@ -242,15 +372,69 @@ export function mergeStudioOutputRecords(
   currentOutputs: StudioOutputRecord[],
   nextOutputs: StudioOutputRecord[],
 ) {
-  const outputsByKey = new Map<string, StudioOutputRecord>();
+  return dedupeStudioOutputs(
+    [...currentOutputs, ...nextOutputs].map(stripSignedOutputFields),
+  );
+}
 
-  for (const output of [...currentOutputs, ...nextOutputs]) {
-    outputsByKey.set(output.objectPath || output.id, stripSignedOutputFields(output));
+export function dedupeStudioOutputs<T extends StudioOutputRecord>(outputs: T[]) {
+  const outputsByKey = new Map<string, T>();
+  const orderedOutputs = [...outputs].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  for (const output of orderedOutputs) {
+    const key = getStudioOutputStableKey(output);
+
+    if (!outputsByKey.has(key)) {
+      outputsByKey.set(key, output);
+    }
   }
 
   return [...outputsByKey.values()].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
+}
+
+export function getStudioOutputStableKey(
+  output: Pick<StudioOutputRecord, "kind" | "fileName" | "metadata">,
+) {
+  if (
+    output.kind === "carousel_slide_png" ||
+    output.kind === "carousel_slide_svg"
+  ) {
+    const slideKey =
+      metadataScalar(output.metadata, "slideId") ||
+      metadataScalar(output.metadata, "slideIndex");
+
+    if (slideKey) {
+      return `${output.kind}:${slideKey}`;
+    }
+  }
+
+  if (output.kind === "generated_asset") {
+    const assetKey = metadataScalar(output.metadata, "assetId");
+
+    if (assetKey) {
+      return `${output.kind}:${assetKey}`;
+    }
+  }
+
+  return output.kind;
+}
+
+function metadataScalar(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return "";
 }
 
 export const outputKindLabels: Record<StudioOutputKind, string> = {
