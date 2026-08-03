@@ -34,6 +34,7 @@ import {
   updateApprovedPostCaptionCopy,
   updateApprovedPostNotes,
   updateApprovedPostStatus,
+  upsertApprovedPost,
   visualAssetRejectionReasons,
   type ApprovedPost,
   type ApprovedPostCaptionCopyEdit,
@@ -72,6 +73,7 @@ import {
 } from "../../create/export-utils";
 import {
   buildStudioProjectRecordFromApprovedPost,
+  fetchStudioProjectRecord,
   syncStudioProjectRecord,
 } from "../../../lib/persistence/studio-projects";
 import {
@@ -163,34 +165,52 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     const localPosts = readApprovedPosts();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPosts(localPosts);
-    setStorageStatus("Carregando arquivos duraveis...");
+    setStorageStatus("Carregando post e arquivos duraveis...");
 
-    void fetchStudioOutputs(postId)
-      .then((outputs) => {
+    void Promise.allSettled([
+      fetchStudioProjectRecord(postId),
+      fetchStudioOutputs(postId),
+    ]).then(([projectResult, outputsResult]) => {
+      let nextPosts = localPosts;
+      const recoveredPost =
+        projectResult.status === "fulfilled"
+          ? projectResult.value.approvedPostData
+          : null;
+
+      if (recoveredPost) {
+        nextPosts = upsertApprovedPost(nextPosts, recoveredPost);
+        setStatus("Post recuperado da biblioteca persistida.");
+        window.setTimeout(() => setStatus(""), 2600);
+      }
+
+      if (outputsResult.status === "fulfilled") {
+        const outputs = outputsResult.value;
         const durableOutputs = outputs.map(stripSignedOutputFields);
-        const nextPosts = appendApprovedPostDurableOutputs(
-          localPosts,
+
+        nextPosts = appendApprovedPostDurableOutputs(
+          nextPosts,
           postId,
           durableOutputs,
         );
 
         setOutputLinks(outputs);
-        setPosts(nextPosts);
-        window.localStorage.setItem(
-          APPROVED_POSTS_STORAGE_KEY,
-          JSON.stringify(nextPosts),
-        );
         setStorageStatus(
           outputs.length
             ? "Arquivos duraveis carregados."
             : "Nenhum arquivo duravel salvo ainda.",
         );
-      })
-      .catch(() => {
+      } else {
         setStorageStatus(
           "Storage indisponivel ou nao configurado. Os arquivos continuam no navegador.",
         );
-      });
+      }
+
+      setPosts(nextPosts);
+      window.localStorage.setItem(
+        APPROVED_POSTS_STORAGE_KEY,
+        JSON.stringify(nextPosts),
+      );
+    });
   }, [postId]);
 
   const post = useMemo(
@@ -738,6 +758,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             <Link className="text-link" href="/projects">
               Projetos
             </Link>
+            <Link className="text-link" href="/outputs">
+              Entregas
+            </Link>
           </div>
           <div>
             <p className="eyebrow">Marco 6</p>
@@ -756,6 +779,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </p>
           <Link className="secondary-button" href="/projects">
             Ver projetos
+          </Link>
+          <Link className="secondary-button" href="/outputs">
+            Ver entregas
           </Link>
           <Link className="primary-button" href="/approved">
             Voltar para aprovados
@@ -780,6 +806,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           </Link>
           <Link className="text-link" href="/projects">
             Projetos
+          </Link>
+          <Link className="text-link" href="/outputs">
+            Entregas
           </Link>
         </div>
         <div>

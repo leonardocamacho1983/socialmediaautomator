@@ -21,6 +21,7 @@ Included:
 - carousel ZIP upload when the carousel is approved;
 - final package ZIP upload;
 - visible output list in `/approved/[postId]`;
+- aggregated delivery library in `/outputs`;
 - approved post snapshots keep lightweight durable-output metadata.
 
 Not included:
@@ -103,6 +104,7 @@ Storage remains private. The app returns signed URLs for review/download.
 6. Click `Abrir` on the final PNG and confirm the signed URL opens.
 7. Reload the page and confirm the file list is loaded again.
 8. Open `/projects` and confirm the project shows the `Storage` flag.
+9. Open `/outputs` and confirm the saved package appears with PNG/ZIP links.
 
 ## Current Limit
 

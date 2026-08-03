@@ -174,6 +174,9 @@ export function BrandProfileForm() {
           <Link className="text-link" href="/projects">
             Projetos
           </Link>
+          <Link className="text-link" href="/outputs">
+            Entregas
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 1</p>

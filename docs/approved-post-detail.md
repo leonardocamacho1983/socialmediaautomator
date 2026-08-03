@@ -46,6 +46,8 @@ Included:
   mechanical comment copy.
 - save final PNG, final SVG, selected asset, carousel slides, carousel ZIP, and
   final package ZIP to durable storage.
+- recover the approved post snapshot from the persisted project library when
+  `/approved/[postId]` is opened from `/outputs` and browser storage is empty.
 
 Not included:
 
@@ -80,6 +82,8 @@ package status open, no carousel package, and no durable outputs.
 
 The approved post snapshot is still cached in the browser, synchronized to the
 project database, and now can point to durable files in private storage.
+When the local cache does not contain the requested post, the detail page tries
+to load the persisted approved-post snapshot before showing the empty state.
 
 ## Validation
 
@@ -133,3 +137,5 @@ Manual validation:
 19. Apply the first-comment suggestion and confirm the gate updates.
 20. Edit the first comment manually in the lower copy card and confirm the
     saved text persists after reload.
+21. Open the same item from `/outputs` in a fresh browser context and confirm
+    the detail page recovers the persisted post.

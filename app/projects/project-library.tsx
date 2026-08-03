@@ -172,6 +172,9 @@ export function ProjectLibrary() {
           <Link className="text-link" href="/approved">
             Posts aprovados
           </Link>
+          <Link className="text-link" href="/outputs">
+            Entregas
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 7</p>

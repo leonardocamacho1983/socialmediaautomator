@@ -23,6 +23,7 @@ This repository currently contains:
 - Marco 5 Deterministic Carousel Package inside `/approved/[postId]`.
 - Marco 7 persisted project library at `/projects`.
 - Marco 8 durable asset storage for final PNG/SVG/ZIP outputs.
+- Marco 9 delivery library at `/outputs`.
 
 The app still does not generate Reels, automations, analytics, or publications.
 
@@ -32,6 +33,9 @@ storage as a local cache/fallback.
 
 Marco 8 stores finished creative files in a private Supabase Storage bucket and
 returns signed links through internal API routes.
+
+Marco 9 lists saved final packages, files and publication copy in a dedicated
+delivery library.
 
 ## Local
 

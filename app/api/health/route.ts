@@ -21,7 +21,7 @@ export function GET() {
   return Response.json({
     status: "ok",
     service: "socialmediaautomator",
-    milestone: "marco-8-durable-assets",
+    milestone: "marco-9-delivery-library",
     productFeaturesEnabled: true,
     persistenceConfigured,
     storageConfigured,

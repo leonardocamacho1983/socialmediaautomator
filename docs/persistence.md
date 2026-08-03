@@ -102,6 +102,9 @@ database access only.
 ## Runtime Behavior
 
 Marco 8 adds durable file storage separately from project snapshot persistence.
+Marco 9 groups those saved files into delivery packages through
+`/api/storage/packages` and renders them in `/outputs`.
+
 The app still writes localStorage first for continuity:
 
 ```text

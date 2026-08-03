@@ -6,6 +6,7 @@ import {
   STUDIO_ASSET_BUCKET,
   type StudioOutputKind,
   type StudioOutputLink,
+  type StudioOutputPackage,
   type StudioOutputRecord,
 } from "./studio-outputs";
 
@@ -37,7 +38,21 @@ type UploadStudioOutputInput = {
   metadata: Record<string, unknown>;
 };
 
+type StudioOutputPackageRow = StudioOutputRow & {
+  project_title: string | null;
+  project_brand_name: string | null;
+  project_status: string | null;
+  project_visual_status: string | null;
+  project_final_package_status: string | null;
+  project_carousel_status: string | null;
+  project_approved_post_data: unknown;
+  project_summary: unknown;
+  project_updated_at: Date | string | null;
+};
+
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+const STUDIO_OUTPUT_ROW_LIMIT = 1000;
+const STUDIO_OUTPUT_PACKAGE_LIMIT = 100;
 
 let sqlClient: ReturnType<typeof postgres> | null = null;
 let schemaReadyPromise: Promise<void> | null = null;
@@ -78,6 +93,88 @@ export async function listStudioOutputs(approvedPostId: string) {
     .filter((record): record is StudioOutputRecord => Boolean(record));
 
   return Promise.all(records.map(withSignedUrl));
+}
+
+export async function listStudioOutputPackages() {
+  const sql = getSqlClient();
+  await ensureStudioOutputSchema();
+
+  const rows = await sql<StudioOutputPackageRow[]>`
+    select
+      output.id,
+      output.approved_post_id,
+      output.project_id,
+      output.kind,
+      output.label,
+      output.file_name,
+      output.bucket_id,
+      output.object_path,
+      output.content_type,
+      output.size_bytes,
+      output.metadata,
+      output.created_at,
+      output.updated_at,
+      output.deleted_at,
+      project.title as project_title,
+      project.brand_name as project_brand_name,
+      project.status as project_status,
+      project.visual_status as project_visual_status,
+      project.final_package_status as project_final_package_status,
+      project.carousel_status as project_carousel_status,
+      project.approved_post_data as project_approved_post_data,
+      project.summary as project_summary,
+      project.updated_at as project_updated_at
+    from public.studio_asset_outputs as output
+    left join public.studio_projects as project
+      on project.id = output.approved_post_id
+      and project.deleted_at is null
+    where output.deleted_at is null
+    order by output.created_at desc
+    limit ${STUDIO_OUTPUT_ROW_LIMIT}
+  `;
+
+  const packageRows = new Map<
+    string,
+    {
+      anchorRow: StudioOutputPackageRow;
+      outputs: StudioOutputRecord[];
+    }
+  >();
+
+  for (const row of rows) {
+    const output = rowToStudioOutputRecord(row);
+
+    if (!output) {
+      continue;
+    }
+
+    const currentPackage = packageRows.get(output.approvedPostId);
+
+    if (currentPackage) {
+      currentPackage.outputs.push(output);
+    } else {
+      packageRows.set(output.approvedPostId, {
+        anchorRow: row,
+        outputs: [output],
+      });
+    }
+  }
+
+  const packages = await Promise.all(
+    [...packageRows.values()].map(async (packageRow) => {
+      const signedOutputs = await Promise.all(
+        packageRow.outputs.map(withSignedUrl),
+      );
+
+      return buildStudioOutputPackage(packageRow.anchorRow, signedOutputs);
+    }),
+  );
+
+  return packages
+    .sort(
+      (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+    )
+    .slice(0, STUDIO_OUTPUT_PACKAGE_LIMIT);
 }
 
 export async function uploadStudioOutputFile(input: UploadStudioOutputInput) {
@@ -248,7 +345,9 @@ function getRequiredSupabaseConfig() {
 }
 
 function getSupabaseConfig() {
-  const url = cleanEnv(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const url = cleanEnv(
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+  );
   const serviceKey = cleanEnv(
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY,
   );
@@ -351,6 +450,93 @@ function rowToStudioOutputRecord(row: StudioOutputRow | undefined) {
   });
 }
 
+function buildStudioOutputPackage(
+  row: StudioOutputPackageRow,
+  outputs: StudioOutputLink[],
+): StudioOutputPackage {
+  const approvedPost = asRecord(row.project_approved_post_data);
+  const summary = asRecord(row.project_summary);
+  const copy = extractPackageCopy(approvedPost, summary);
+  const outputKinds = new Set(outputs.map((output) => output.kind));
+  const firstProjectId =
+    outputs.find((output) => output.projectId)?.projectId || row.project_id;
+  const metadataTitle = firstNonEmpty(
+    outputs.map((output) => safeRecordString(output.metadata, "title")),
+  );
+  const title =
+    safeString(row.project_title) ||
+    safeRecordString(approvedPost, "title") ||
+    metadataTitle ||
+    "Entrega sem titulo";
+  const brandName =
+    safeString(row.project_brand_name) ||
+    safeRecordString(approvedPost, "brandName") ||
+    "Marca sem nome";
+
+  return {
+    id: row.approved_post_id,
+    approvedPostId: row.approved_post_id,
+    projectId: firstProjectId,
+    title,
+    brandName,
+    status: safeString(row.project_status) || null,
+    visualStatus: safeString(row.project_visual_status) || null,
+    finalPackageStatus: safeString(row.project_final_package_status) || null,
+    carouselStatus: safeString(row.project_carousel_status) || null,
+    caption: copy.caption,
+    firstComment: copy.firstComment,
+    hashtags: copy.hashtags,
+    outputCount: outputs.length,
+    totalSizeBytes: outputs.reduce(
+      (totalSize, output) => totalSize + output.sizeBytes,
+      0,
+    ),
+    savedAt: latestDate(outputs.map((output) => output.createdAt)),
+    updatedAt: dateToIso(row.project_updated_at),
+    hasFinalPng: outputKinds.has("final_post_png"),
+    hasFinalZip: outputKinds.has("final_package_zip"),
+    hasCarousel:
+      outputKinds.has("carousel_zip") || outputKinds.has("carousel_slide_png"),
+    hasSelectedAsset: outputKinds.has("selected_asset"),
+    outputs: outputs.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ),
+  };
+}
+
+function extractPackageCopy(
+  approvedPost: Record<string, unknown> | null,
+  summary: Record<string, unknown> | null,
+) {
+  const projectSnapshot = asRecord(approvedPost?.projectSnapshot);
+  const captionPackage = asRecord(projectSnapshot?.captionPackage);
+  const selectedVariantId = safeRecordString(captionPackage, "selectedVariantId");
+  const variants = Array.isArray(captionPackage?.variants)
+    ? captionPackage.variants
+        .map((variant) => asRecord(variant))
+        .filter((variant): variant is Record<string, unknown> => Boolean(variant))
+    : [];
+  const selectedVariant =
+    variants.find((variant) => safeRecordString(variant, "id") === selectedVariantId) ||
+    variants[0] ||
+    null;
+  const hashtagsValue = selectedVariant?.hashtags;
+  const hashtags = Array.isArray(hashtagsValue)
+    ? hashtagsValue
+        .map((hashtag) => safeString(hashtag))
+        .filter((hashtag) => Boolean(hashtag))
+    : [];
+
+  return {
+    caption:
+      safeRecordString(selectedVariant, "caption") ||
+      safeRecordString(summary, "captionPreview"),
+    firstComment: safeRecordString(selectedVariant, "firstComment"),
+    hashtags,
+  };
+}
+
 function toSqlJson(value: unknown) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -389,6 +575,39 @@ function cleanEnv(value: string | undefined) {
   }
 
   return normalized;
+}
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function safeRecordString(
+  value: Record<string, unknown> | null,
+  key: string,
+) {
+  return safeString(value?.[key]);
+}
+
+function safeString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function firstNonEmpty(values: string[]) {
+  return values.find((value) => value.trim()) || "";
+}
+
+function latestDate(values: string[]) {
+  const dates = values
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (!dates.length) {
+    return new Date().toISOString();
+  }
+
+  return new Date(Math.max(...dates)).toISOString();
 }
 
 function isLocalDatabaseUrl(databaseUrl: string) {

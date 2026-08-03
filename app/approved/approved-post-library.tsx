@@ -228,6 +228,9 @@ export function ApprovedPostLibrary() {
           <Link className="text-link" href="/projects">
             Projetos
           </Link>
+          <Link className="text-link" href="/outputs">
+            Entregas
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 5</p>
@@ -252,6 +255,9 @@ export function ApprovedPostLibrary() {
         </Link>
         <Link className="secondary-button" href="/projects">
           Biblioteca persistida
+        </Link>
+        <Link className="secondary-button" href="/outputs">
+          Entregas salvas
         </Link>
         {status ? (
           <span className="next-step-status" role="status">

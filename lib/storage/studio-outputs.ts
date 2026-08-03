@@ -1,4 +1,5 @@
 export const STUDIO_OUTPUTS_API_PATH = "/api/storage/outputs";
+export const STUDIO_OUTPUT_PACKAGES_API_PATH = "/api/storage/packages";
 export const STUDIO_ASSET_BUCKET = "studio-assets";
 
 export type StudioOutputKind =
@@ -33,6 +34,30 @@ export type StudioOutputLink = StudioOutputRecord & {
   signedUrlExpiresAt: string;
 };
 
+export type StudioOutputPackage = {
+  id: string;
+  approvedPostId: string;
+  projectId: string | null;
+  title: string;
+  brandName: string;
+  status: string | null;
+  visualStatus: string | null;
+  finalPackageStatus: string | null;
+  carouselStatus: string | null;
+  caption: string;
+  firstComment: string;
+  hashtags: string[];
+  outputCount: number;
+  totalSizeBytes: number;
+  savedAt: string;
+  updatedAt: string | null;
+  hasFinalPng: boolean;
+  hasFinalZip: boolean;
+  hasCarousel: boolean;
+  hasSelectedAsset: boolean;
+  outputs: StudioOutputLink[];
+};
+
 export type StudioOutputUploadInput = {
   approvedPostId: string;
   projectId?: string | null;
@@ -59,6 +84,17 @@ export type StudioOutputListResponse =
   | {
       ok: true;
       outputs: StudioOutputLink[];
+    }
+  | {
+      ok: false;
+      error: string;
+      code?: string;
+    };
+
+export type StudioOutputPackageListResponse =
+  | {
+      ok: true;
+      packages: StudioOutputPackage[];
     }
   | {
       ok: false;
@@ -106,6 +142,25 @@ export async function fetchStudioOutputs(approvedPostId: string) {
   }
 
   return payload.outputs;
+}
+
+export async function fetchStudioOutputPackages() {
+  const response = await fetch(STUDIO_OUTPUT_PACKAGES_API_PATH, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const payload: StudioOutputPackageListResponse = await response
+    .json()
+    .catch(() => ({
+      ok: false,
+      error: "Resposta invalida ao carregar entregas.",
+    }));
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Falha ao carregar entregas." : payload.error);
+  }
+
+  return payload.packages;
 }
 
 export function stripSignedOutputFields(
