@@ -68,6 +68,10 @@ import {
   svgToPngBlob,
   type ZipDownloadFile,
 } from "../../create/export-utils";
+import {
+  buildStudioProjectRecordFromApprovedPost,
+  syncStudioProjectRecord,
+} from "../../../lib/persistence/studio-projects";
 
 type ApprovedPostDetailProps = {
   postId: string;
@@ -174,6 +178,17 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       APPROVED_POSTS_STORAGE_KEY,
       JSON.stringify(nextPosts),
     );
+    const changedPost = nextPosts.find((candidate) => candidate.id === postId);
+
+    if (changedPost) {
+      void syncStudioProjectRecord(
+        buildStudioProjectRecordFromApprovedPost(changedPost),
+      ).catch(() => {
+        setStatus(
+          "Alteracao salva no navegador. Banco indisponivel ou nao configurado.",
+        );
+      });
+    }
   }
 
   function updateStatus(nextStatus: ApprovedPostStatus) {
@@ -736,12 +751,15 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
             <Link className="text-link" href="/create">
               Criar post
             </Link>
+            <Link className="text-link" href="/projects">
+              Projetos
+            </Link>
           </div>
           <div>
             <p className="eyebrow">Marco 6</p>
             <h1>Post não encontrado</h1>
             <p className="lead">
-              Este post não existe na biblioteca local deste navegador.
+              Este post não existe na biblioteca carregada neste navegador.
             </p>
           </div>
         </header>
@@ -749,9 +767,12 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
         <section className="approved-empty">
           <strong>Biblioteca local sem este item.</strong>
           <p>
-            A biblioteca ainda vive no navegador. Se o post foi aprovado em
-            outro dispositivo, ele não aparece aqui.
+            Abra a biblioteca persistida para carregar projetos salvos no banco
+            ou volte para os aprovados deste navegador.
           </p>
+          <Link className="secondary-button" href="/projects">
+            Ver projetos
+          </Link>
           <Link className="primary-button" href="/approved">
             Voltar para aprovados
           </Link>
@@ -773,6 +794,9 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           <Link className="text-link" href="/create">
             Criar post
           </Link>
+          <Link className="text-link" href="/projects">
+            Projetos
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 6</p>
@@ -780,8 +804,8 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           <p className="lead">
             Revisão individual do post aprovado, com escolha de asset,
             composição visual, Quality Gate de copy, aprovação final e primeiro
-            carrossel. Ainda sem publicação, Zernio, banco de dados ou
-            automação.
+            carrossel. Agora sincroniza o snapshot no banco, ainda sem
+            publicação, Zernio ou automação.
           </p>
         </div>
       </header>

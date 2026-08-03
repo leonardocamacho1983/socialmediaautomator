@@ -26,7 +26,7 @@ Not included:
 - final copy;
 - rendered assets;
 - Recraft or image generation;
-- Supabase persistence;
+- Supabase persistence, added later in Marco 7;
 - Zernio;
 - scheduling or publishing;
 - analytics;

@@ -23,6 +23,11 @@ import {
   type ApprovedPostVisualStatus,
 } from "../../lib/creative/approved-posts";
 import { CREATIVE_PROJECT_STORAGE_KEY } from "../../lib/creative/concepts";
+import {
+  buildStudioProjectRecordFromApprovedPost,
+  fetchStudioProjectRecords,
+  syncStudioProjectRecord,
+} from "../../lib/persistence/studio-projects";
 import { downloadSvgAsPng, slugify } from "../create/export-utils";
 
 const statusLabels: Record<ApprovedPostStatus, string> = {
@@ -57,11 +62,36 @@ export function ApprovedPostLibrary() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApprovedPostFilter>("all");
   const [status, setStatus] = useState("");
+  const [persistenceStatus, setPersistenceStatus] = useState(
+    "Carregando biblioteca local.",
+  );
 
   useEffect(() => {
-    // The library is stored in browser-only localStorage.
+    const localPosts = readApprovedPosts();
+    // The library hydrates from browser storage first and then merges database records.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPosts(readApprovedPosts());
+    setPosts(localPosts);
+    setPersistenceStatus("Carregando projetos do banco...");
+
+    void fetchStudioProjectRecords()
+      .then((records) => {
+        const persistedPosts = records
+          .map((record) => record.approvedPostData)
+          .filter((post): post is ApprovedPost => Boolean(post));
+        const mergedPosts = mergeApprovedPosts(localPosts, persistedPosts);
+
+        setPosts(mergedPosts);
+        window.localStorage.setItem(
+          APPROVED_POSTS_STORAGE_KEY,
+          JSON.stringify(mergedPosts),
+        );
+        setPersistenceStatus("Biblioteca sincronizada com o banco.");
+      })
+      .catch(() => {
+        setPersistenceStatus(
+          "Usando biblioteca do navegador. Banco indisponivel ou nao configurado.",
+        );
+      });
   }, []);
 
   const sortedPosts = useMemo(
@@ -114,6 +144,19 @@ export function ApprovedPostLibrary() {
       APPROVED_POSTS_STORAGE_KEY,
       JSON.stringify(nextPosts),
     );
+    void Promise.all(
+      nextPosts.map((post) =>
+        syncStudioProjectRecord(buildStudioProjectRecordFromApprovedPost(post)),
+      ),
+    )
+      .then(() => {
+        setPersistenceStatus("Biblioteca sincronizada com o banco.");
+      })
+      .catch(() => {
+        setPersistenceStatus(
+          "Alteracao salva no navegador. Banco indisponivel ou nao configurado.",
+        );
+      });
   }
 
   function updateStatus(postId: string, nextStatus: ApprovedPostStatus) {
@@ -182,6 +225,9 @@ export function ApprovedPostLibrary() {
           <Link className="text-link" href="/create">
             Criar post
           </Link>
+          <Link className="text-link" href="/projects">
+            Projetos
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 5</p>
@@ -189,7 +235,7 @@ export function ApprovedPostLibrary() {
           <p className="lead">
             Cockpit local dos pacotes finais aprovados, agora com status visual,
             pacotes prontos para exportacao e carrossel deterministico. Ainda
-            sem Zernio, calendario, publicacao, banco de dados ou automacao.
+            sem Zernio, calendario, publicacao ou automacao.
           </p>
         </div>
       </header>
@@ -204,11 +250,17 @@ export function ApprovedPostLibrary() {
         <Link className="primary-button" href="/create">
           Criar novo post
         </Link>
+        <Link className="secondary-button" href="/projects">
+          Biblioteca persistida
+        </Link>
         {status ? (
           <span className="next-step-status" role="status">
             {status}
           </span>
         ) : null}
+        <span className="next-step-status" role="status">
+          {persistenceStatus}
+        </span>
       </section>
 
       <section className="approved-cockpit" aria-label="Resumo dos aprovados">
@@ -517,6 +569,26 @@ function readApprovedPosts() {
   } catch {
     return [];
   }
+}
+
+function mergeApprovedPosts(localPosts: ApprovedPost[], persistedPosts: ApprovedPost[]) {
+  const postsById = new Map<string, ApprovedPost>();
+
+  for (const post of [...persistedPosts, ...localPosts]) {
+    const current = postsById.get(post.id);
+
+    if (!current || getPostTime(post) >= getPostTime(current)) {
+      postsById.set(post.id, post);
+    }
+  }
+
+  return [...postsById.values()].sort(
+    (a, b) => getPostTime(b) - getPostTime(a),
+  );
+}
+
+function getPostTime(post: ApprovedPost) {
+  return new Date(post.updatedAt || post.approvedAt).getTime();
 }
 
 function saveProjectSnapshot(

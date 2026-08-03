@@ -23,9 +23,9 @@ Included:
 - link from the final package approval state to `/approved`;
 - link to start a new post after approval.
 
-Not included:
+Not included in this original milestone:
 
-- Supabase persistence;
+- Supabase persistence, added later in Marco 7;
 - Zernio;
 - scheduling or publishing;
 - analytics;
@@ -45,8 +45,8 @@ Each item stores a complete `CreativeProject` snapshot. This is deliberate for
 now: the library must preserve the exact concept, visual piece, caption package,
 and approval checklist that existed when the post was approved.
 
-This is still browser-local state. It is not a durable production content
-database.
+Marco 7 adds database synchronization for this same approved-post snapshot. The
+browser record remains the local cache/fallback.
 
 ## Validation
 

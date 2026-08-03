@@ -44,6 +44,11 @@ import {
   type TypographicCopy,
   type TypographicVariantId,
 } from "../../lib/creative/typographic-piece";
+import {
+  buildStudioProjectRecordFromApprovedPost,
+  buildStudioProjectRecordFromProject,
+  syncStudioProjectRecord,
+} from "../../lib/persistence/studio-projects";
 
 const objectiveOptions = Object.entries(objectiveLabels) as Array<
   [CreativeBriefing["objective"], string]
@@ -72,6 +77,9 @@ export function ConceptGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [status, setStatus] = useState("Carregando perfil de marca.");
+  const [persistenceStatus, setPersistenceStatus] = useState(
+    "Persistencia aguardando projeto.",
+  );
   const [error, setError] = useState("");
   const [captionError, setCaptionError] = useState("");
   const [
@@ -166,6 +174,7 @@ export function ConceptGenerator() {
       JSON.stringify(nextProject),
     );
     setProject(nextProject);
+    syncProjectInBackground(nextProject);
   }
 
   function persistApprovedPost(
@@ -195,6 +204,37 @@ export function ConceptGenerator() {
       APPROVED_POSTS_STORAGE_KEY,
       JSON.stringify(upsertApprovedPost(currentPosts, approvedPost)),
     );
+    syncApprovedPostInBackground(approvedPost);
+  }
+
+  function syncProjectInBackground(nextProject: CreativeProject) {
+    setPersistenceStatus("Salvando projeto no banco...");
+    void syncStudioProjectRecord(
+      buildStudioProjectRecordFromProject(nextProject),
+    )
+      .then(() => {
+        setPersistenceStatus("Projeto sincronizado no banco.");
+      })
+      .catch(() => {
+        setPersistenceStatus(
+          "Projeto salvo no navegador. Banco indisponivel ou nao configurado.",
+        );
+      });
+  }
+
+  function syncApprovedPostInBackground(approvedPost: ApprovedPost) {
+    setPersistenceStatus("Salvando aprovado no banco...");
+    void syncStudioProjectRecord(
+      buildStudioProjectRecordFromApprovedPost(approvedPost),
+    )
+      .then(() => {
+        setPersistenceStatus("Post aprovado sincronizado no banco.");
+      })
+      .catch(() => {
+        setPersistenceStatus(
+          "Post aprovado salvo no navegador. Banco indisponivel ou nao configurado.",
+        );
+      });
   }
 
   function startNewPost() {
@@ -574,6 +614,9 @@ export function ConceptGenerator() {
           <Link className="text-link" href="/approved">
             Posts aprovados
           </Link>
+          <Link className="text-link" href="/projects">
+            Projetos
+          </Link>
         </div>
         <div>
           <p className="eyebrow">Marco 2</p>
@@ -595,6 +638,7 @@ export function ConceptGenerator() {
           <div className="status-strip">
             <strong>{brandProfile?.brandName || "Marca nao carregada"}</strong>
             <span>{status}</span>
+            <span>{persistenceStatus}</span>
           </div>
 
           <label className="field">
@@ -729,7 +773,7 @@ export function ConceptGenerator() {
                 </h3>
                 <p>
                   {activeFinalPostPackage
-                    ? "O pacote final foi aprovado e salvo na biblioteca local de posts aprovados."
+                    ? "O pacote final foi aprovado e salvo na biblioteca de posts aprovados."
                     : activeCaptionPackage
                       ? "Revise o pacote final do post antes de considerar esta peca pronta para uso."
                     : activeTypographicPiece

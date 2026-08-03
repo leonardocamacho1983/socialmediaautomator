@@ -164,9 +164,17 @@ export function BrandProfileForm() {
   return (
     <main className="brand-shell">
       <header className="brand-header">
-        <Link className="text-link" href="/">
-          Voltar
-        </Link>
+        <div className="nav-row">
+          <Link className="text-link" href="/">
+            Inicio
+          </Link>
+          <Link className="text-link" href="/create">
+            Criar post
+          </Link>
+          <Link className="text-link" href="/projects">
+            Projetos
+          </Link>
+        </div>
         <div>
           <p className="eyebrow">Marco 1</p>
           <h1>Brand Foundation</h1>

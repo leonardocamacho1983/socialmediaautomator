@@ -12,6 +12,7 @@ const checks = [
   "Marco 4.1 com variacoes, rejeicao e aprovacao visual",
   "Marco 4.2 com pacote final, ZIP e historico visual",
   "Marco 5 com carrossel deterministico em seis slides",
+  "Marco 7 com biblioteca persistida de projetos",
   "Sem Reels, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];
@@ -41,6 +42,9 @@ export default function Home() {
           </Link>
           <Link className="primary-link" href="/approved">
             Ver aprovados
+          </Link>
+          <Link className="primary-link secondary-accent" href="/projects">
+            Ver projetos
           </Link>
           <a className="health-link" href="/api/health">
             Ver health check

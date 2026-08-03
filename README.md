@@ -21,9 +21,14 @@ This repository currently contains:
 - Marco 4.1 Visual Asset Review, composition variants, rejection, and approval.
 - Marco 4.2 Final Package Export with ZIP, visual history, and package status.
 - Marco 5 Deterministic Carousel Package inside `/approved/[postId]`.
+- Marco 7 persisted project library at `/projects`.
 
 The app still does not generate Reels, automations, analytics, durable asset
 storage, or publications.
+
+Marco 7 uses a server-side database connection when available, falling back to
+Supabase REST with a server-only service key. The app still keeps browser
+storage as a local cache/fallback.
 
 ## Local
 
