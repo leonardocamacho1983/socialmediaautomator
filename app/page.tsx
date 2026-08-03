@@ -13,6 +13,7 @@ const checks = [
   "Marco 4.2 com pacote final, ZIP e historico visual",
   "Marco 5 com carrossel deterministico em seis slides",
   "Marco 7 com biblioteca persistida de projetos",
+  "Marco 8 com storage duravel dos arquivos finais",
   "Sem Reels, publicacao ou automacao neste momento",
   "Health check minimo disponivel",
 ];
@@ -26,7 +27,8 @@ export default function Home() {
         <p className="lead">
           O reset foi concluido. Agora o sistema estrutura a marca e gera
           conceitos, peca tipografica, legenda, pacote final e assets visuais
-          com revisao visual e primeiro carrossel antes de qualquer automacao.
+          com revisao visual, primeiro carrossel e storage duravel antes de
+          qualquer automacao.
         </p>
         <ul className="check-list" aria-label="Status do reset">
           {checks.map((check) => (

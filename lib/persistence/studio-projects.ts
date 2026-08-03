@@ -24,6 +24,7 @@ export type StudioProjectSummary = {
   hasFinalPackage: boolean;
   hasVisualAsset: boolean;
   hasApprovedCarousel: boolean;
+  hasDurableOutputs: boolean;
   captionPreview: string;
   updatedAt: string;
 };
@@ -273,6 +274,7 @@ function buildStudioProjectSummary(
     hasFinalPackage: Boolean(project.finalPostPackage),
     hasVisualAsset: Boolean(approvedPost?.selectedVisualAssetId),
     hasApprovedCarousel: approvedPost?.carouselStatus === "approved",
+    hasDurableOutputs: Boolean(approvedPost?.durableOutputs.length),
     captionPreview: captionVariant?.caption.slice(0, 220) || "",
     updatedAt:
       approvedPost?.updatedAt || project.updatedAt || new Date().toISOString(),

@@ -71,7 +71,7 @@ export async function downloadZipFile(files: ZipDownloadFile[], fileName: string
   downloadBlob(zipBlob, fileName);
 }
 
-async function createZipBlob(files: ZipDownloadFile[]) {
+export async function createZipBlob(files: ZipDownloadFile[]) {
   const localParts: BlobPart[] = [];
   const centralParts: BlobPart[] = [];
   let offset = 0;

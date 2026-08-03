@@ -22,6 +22,11 @@ import {
   svgToDataUrl,
   type TypographicPiece,
 } from "./typographic-piece";
+import {
+  mergeStudioOutputRecords,
+  normalizeStudioOutputRecord,
+  type StudioOutputRecord,
+} from "../storage/studio-outputs";
 
 export const APPROVED_POSTS_STORAGE_KEY =
   "socialmediaautomator.approvedPosts.v1";
@@ -149,6 +154,7 @@ export type ApprovedPost = {
   visualApprovedAt: string | null;
   visualAssetRejections: VisualAssetRejection[];
   visualEvents: ApprovedPostVisualEvent[];
+  durableOutputs: StudioOutputRecord[];
   projectSnapshot: CreativeProject;
 };
 
@@ -169,6 +175,7 @@ type StoredApprovedPost = Omit<
   | "carouselPackage"
   | "carouselEvents"
   | "carouselGenerationIndex"
+  | "durableOutputs"
 > & {
   notes?: string;
   generatedAssets?: GeneratedVisualAsset[];
@@ -185,6 +192,7 @@ type StoredApprovedPost = Omit<
   carouselPackage?: CarouselPackage | null;
   carouselEvents?: ApprovedPostCarouselEvent[];
   carouselGenerationIndex?: number | null;
+  durableOutputs?: unknown[];
 };
 
 export function createApprovedPostFromProject(
@@ -221,6 +229,7 @@ export function createApprovedPostFromProject(
     visualApprovedAt: null,
     visualAssetRejections: [],
     visualEvents: [],
+    durableOutputs: [],
     projectSnapshot: project,
   };
 }
@@ -246,6 +255,7 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
       );
       const visualEvents = normalizeVisualEvents(post.visualEvents);
       const carouselPackage = normalizeCarouselPackage(post.carouselPackage);
+      const durableOutputs = normalizeDurableOutputs(post.durableOutputs);
 
       return {
         ...post,
@@ -284,6 +294,7 @@ export function parseApprovedPosts(value: unknown): ApprovedPost[] {
           post.carouselGenerationIndex,
           carouselPackage,
         ),
+        durableOutputs,
       };
     });
 }
@@ -315,8 +326,28 @@ export function upsertApprovedPost(posts: ApprovedPost[], post: ApprovedPost) {
           carouselPackage: item.carouselPackage || null,
           carouselEvents: item.carouselEvents || [],
           carouselGenerationIndex: item.carouselGenerationIndex || 0,
+          durableOutputs: item.durableOutputs || [],
         }
       : item,
+  );
+}
+
+export function appendApprovedPostDurableOutputs(
+  posts: ApprovedPost[],
+  postId: string,
+  outputs: StudioOutputRecord[],
+): ApprovedPost[] {
+  return posts.map((post) =>
+    post.id === postId
+      ? {
+          ...post,
+          durableOutputs: mergeStudioOutputRecords(
+            post.durableOutputs,
+            outputs,
+          ),
+          updatedAt: new Date().toISOString(),
+        }
+      : post,
   );
 }
 
@@ -1298,6 +1329,17 @@ function normalizeCarouselEvents(value: unknown) {
   }
 
   return value.filter(isApprovedPostCarouselEvent).slice(0, 48);
+}
+
+function normalizeDurableOutputs(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(normalizeStudioOutputRecord)
+    .filter((output): output is StudioOutputRecord => Boolean(output))
+    .slice(0, 80);
 }
 
 function normalizeCarouselPackage(value: unknown): CarouselPackage | null {

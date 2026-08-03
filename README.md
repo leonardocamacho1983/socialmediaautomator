@@ -22,13 +22,16 @@ This repository currently contains:
 - Marco 4.2 Final Package Export with ZIP, visual history, and package status.
 - Marco 5 Deterministic Carousel Package inside `/approved/[postId]`.
 - Marco 7 persisted project library at `/projects`.
+- Marco 8 durable asset storage for final PNG/SVG/ZIP outputs.
 
-The app still does not generate Reels, automations, analytics, durable asset
-storage, or publications.
+The app still does not generate Reels, automations, analytics, or publications.
 
 Marco 7 uses a server-side database connection when available, falling back to
 Supabase REST with a server-only service key. The app still keeps browser
 storage as a local cache/fallback.
+
+Marco 8 stores finished creative files in a private Supabase Storage bucket and
+returns signed links through internal API routes.
 
 ## Local
 

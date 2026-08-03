@@ -147,9 +147,13 @@ export async function upsertStudioProject(record: StudioProjectRecord) {
       ${record.visualStatus},
       ${record.finalPackageStatus},
       ${record.carouselStatus},
-      ${sql.json(record.projectData)},
-      ${record.approvedPostData ? sql.json(record.approvedPostData) : null},
-      ${sql.json(record.summary)},
+      ${sql.json(toSqlJson(record.projectData))},
+      ${
+        record.approvedPostData
+          ? sql.json(toSqlJson(record.approvedPostData))
+          : null
+      },
+      ${sql.json(toSqlJson(record.summary))},
       ${record.createdAt || record.updatedAt},
       ${record.updatedAt},
       null
@@ -400,6 +404,10 @@ function toStudioProjectRestPayload(record: StudioProjectRecord) {
     updated_at: record.updatedAt,
     deleted_at: null,
   };
+}
+
+function toSqlJson(value: unknown) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function ensureStudioProjectsSchema() {

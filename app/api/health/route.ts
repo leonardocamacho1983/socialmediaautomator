@@ -7,6 +7,7 @@ import {
   DEFAULT_CAPTION_MODEL,
 } from "../../../lib/creative/captions";
 import { isStudioPersistenceConfigured } from "../../../lib/persistence/studio-project-store";
+import { isStudioStorageConfigured } from "../../../lib/storage/studio-output-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,13 +16,15 @@ export function GET() {
   const staticGatewayKeyPresent = Boolean(process.env.AI_GATEWAY_API_KEY);
   const vercelRuntimePresent = Boolean(process.env.VERCEL);
   const persistenceConfigured = isStudioPersistenceConfigured();
+  const storageConfigured = isStudioStorageConfigured();
 
   return Response.json({
     status: "ok",
     service: "socialmediaautomator",
-    milestone: "marco-7-persistence",
+    milestone: "marco-8-durable-assets",
     productFeaturesEnabled: true,
     persistenceConfigured,
+    storageConfigured,
     aiGatewayConfigured: staticGatewayKeyPresent || vercelRuntimePresent,
     aiGatewayAuth: {
       staticApiKeyPresent: staticGatewayKeyPresent,

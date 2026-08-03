@@ -303,6 +303,7 @@ export function ProjectLibrary() {
                 {project.summary.hasApprovedCarousel ? (
                   <span>Carrossel</span>
                 ) : null}
+                {project.summary.hasDurableOutputs ? <span>Storage</span> : null}
               </div>
 
               <div className="approved-post-actions">

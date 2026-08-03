@@ -12,6 +12,7 @@ import {
 import {
   APPROVED_POSTS_STORAGE_KEY,
   appendApprovedPostAssets,
+  appendApprovedPostDurableOutputs,
   applyApprovedPostSafeCopyFixes,
   approveApprovedPostCarousel,
   approveApprovedPostVisual,
@@ -64,6 +65,7 @@ import { CREATIVE_PROJECT_STORAGE_KEY } from "../../../lib/creative/concepts";
 import {
   downloadSvgAsPng,
   downloadZipFile,
+  createZipBlob,
   slugify,
   svgToPngBlob,
   type ZipDownloadFile,
@@ -72,12 +74,35 @@ import {
   buildStudioProjectRecordFromApprovedPost,
   syncStudioProjectRecord,
 } from "../../../lib/persistence/studio-projects";
+import {
+  fetchStudioOutputs,
+  outputKindLabels,
+  stripSignedOutputFields,
+  uploadStudioOutput,
+  type StudioOutputLink,
+  type StudioOutputRecord,
+  type StudioOutputKind,
+} from "../../../lib/storage/studio-outputs";
 
 type ApprovedPostDetailProps = {
   postId: string;
 };
 
 type ApprovedPostView = NonNullable<ReturnType<typeof buildApprovedPostView>>;
+
+type DurableOutputDisplay = StudioOutputRecord & {
+  signedUrl?: string;
+  signedUrlExpiresAt?: string;
+};
+
+type DurableUploadFile = {
+  kind: StudioOutputKind;
+  label: string;
+  fileName: string;
+  content: Blob | string;
+  contentType: string;
+  metadata: Record<string, unknown>;
+};
 
 const statusLabels: Record<ApprovedPostStatus, string> = {
   approved: "Aprovado",
@@ -127,14 +152,46 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
   const [posts, setPosts] = useState<ApprovedPost[]>([]);
   const [assetPrompt, setAssetPrompt] = useState("");
   const [assetStatus, setAssetStatus] = useState("");
+  const [storageStatus, setStorageStatus] = useState("");
   const [isGeneratingAsset, setIsGeneratingAsset] = useState(false);
+  const [isSavingDurableOutputs, setIsSavingDurableOutputs] = useState(false);
+  const [outputLinks, setOutputLinks] = useState<StudioOutputLink[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    // The approved post library is stored in browser-only localStorage.
+    // The approved post library hydrates from browser storage before fetching durable files.
+    const localPosts = readApprovedPosts();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPosts(readApprovedPosts());
-  }, []);
+    setPosts(localPosts);
+    setStorageStatus("Carregando arquivos duraveis...");
+
+    void fetchStudioOutputs(postId)
+      .then((outputs) => {
+        const durableOutputs = outputs.map(stripSignedOutputFields);
+        const nextPosts = appendApprovedPostDurableOutputs(
+          localPosts,
+          postId,
+          durableOutputs,
+        );
+
+        setOutputLinks(outputs);
+        setPosts(nextPosts);
+        window.localStorage.setItem(
+          APPROVED_POSTS_STORAGE_KEY,
+          JSON.stringify(nextPosts),
+        );
+        setStorageStatus(
+          outputs.length
+            ? "Arquivos duraveis carregados."
+            : "Nenhum arquivo duravel salvo ainda.",
+        );
+      })
+      .catch(() => {
+        setStorageStatus(
+          "Storage indisponivel ou nao configurado. Os arquivos continuam no navegador.",
+        );
+      });
+  }, [postId]);
 
   const post = useMemo(
     () => posts.find((item) => item.id === postId) || null,
@@ -171,6 +228,10 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     copyQualityReport?.issues.filter(
       (issue) => issue.field === "firstComment",
     ) || [];
+  const durableOutputs = useMemo(
+    () => mergeDurableOutputLinks(post?.durableOutputs || [], outputLinks),
+    [outputLinks, post?.durableOutputs],
+  );
 
   function persistPosts(nextPosts: ApprovedPost[]) {
     setPosts(nextPosts);
@@ -303,100 +364,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
     setStatus("Montando pacote final...");
 
     try {
-      const exportSvg = view.assetSvg || view.svg;
-      const pngBlob = await svgToPngBlob(exportSvg);
-      const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}`;
-      const files: ZipDownloadFile[] = [
-        {
-          name: "01-post/post-final-1080x1350.png",
-          content: pngBlob,
-        },
-        {
-          name: "01-post/post-final.svg",
-          content: exportSvg,
-        },
-        {
-          name: "02-copy/legenda.txt",
-          content: view.caption,
-        },
-        {
-          name: "02-copy/primeiro-comentario.txt",
-          content: view.firstComment || "",
-        },
-        {
-          name: "02-copy/hashtags.txt",
-          content: view.hashtags || "",
-        },
-        {
-          name: "02-copy/post-completo.txt",
-          content: buildReadyToPublishCopy(view),
-        },
-        {
-          name: "02-copy/pacote-copy.md",
-          content: buildCopyPackageMarkdown(post, view),
-        },
-        {
-          name: "04-assets/asset-prompt.txt",
-          content: view.selectedAsset?.prompt || "Sem asset visual selecionado.",
-        },
-        {
-          name: "05-metadata/post.json",
-          content: JSON.stringify(buildFinalPackageMetadata(post, view), null, 2),
-        },
-        {
-          name: "05-metadata/visual-history.json",
-          content: JSON.stringify(post.visualEvents, null, 2),
-        },
-        {
-          name: "05-metadata/carousel-history.json",
-          content: JSON.stringify(post.carouselEvents, null, 2),
-        },
-      ];
-
-      if (view.selectedAsset?.dataUrl) {
-        files.push({
-          name: "04-assets/selected-asset.png",
-          content: dataUrlToBlob(view.selectedAsset.dataUrl),
-        });
-      } else {
-        files.push({
-          name: "04-assets/README.md",
-          content:
-            "Este pacote usa apenas a composicao tipografica renderizada pelo sistema. Nao ha asset visual separado.",
-        });
-      }
-
-      const carouselIncluded = await appendFinalPackageCarouselFiles(
-        files,
-        post,
-        view,
-      );
-      const readmeName = "README.md";
-      const manifestName = "05-metadata/manifest.json";
-      const packageFileNames = [
-        readmeName,
-        ...files.map((file) => file.name),
-        manifestName,
-      ];
-
-      files.unshift({
-        name: readmeName,
-        content: buildFinalPackageReadme(post, view, {
-          carouselIncluded,
-          fileNames: packageFileNames,
-        }),
-      });
-      files.push({
-        name: manifestName,
-        content: JSON.stringify(
-          buildFinalPackageManifest(post, view, {
-            carouselIncluded,
-            fileNames: packageFileNames,
-          }),
-          null,
-          2,
-        ),
-      });
+      const { baseFileName, files } = await buildFinalPackageFiles(post, view);
 
       await downloadZipFile(files, `${baseFileName}-pacote-final.zip`);
       persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
@@ -404,6 +372,68 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
       window.setTimeout(() => setStatus(""), 2600);
     } catch {
       setStatus("Nao foi possivel baixar o pacote final.");
+    }
+  }
+
+  async function saveDurableOutputs() {
+    if (!post || !view) {
+      setStorageStatus("Post aprovado incompleto.");
+      return;
+    }
+
+    if (post.finalPackageStatus !== "ready") {
+      setStorageStatus("Finalize o pacote antes de salvar arquivos duraveis.");
+      return;
+    }
+
+    setIsSavingDurableOutputs(true);
+    setStorageStatus("Preparando arquivos duraveis...");
+
+    try {
+      const files = await buildDurableUploadFiles(post, view);
+      const savedOutputs: StudioOutputLink[] = [];
+
+      for (const [index, file] of files.entries()) {
+        setStorageStatus(
+          `Salvando ${index + 1}/${files.length}: ${file.label}.`,
+        );
+        const blob =
+          typeof file.content === "string"
+            ? new Blob([file.content], { type: file.contentType })
+            : file.content;
+        const output = await uploadStudioOutput({
+          approvedPostId: post.id,
+          projectId: post.projectSnapshot.id,
+          kind: file.kind,
+          label: file.label,
+          fileName: file.fileName,
+          contentType: file.contentType,
+          dataBase64: await blobToBase64(blob),
+          metadata: file.metadata,
+        });
+
+        savedOutputs.push(output);
+      }
+
+      setOutputLinks((currentOutputs) =>
+        mergeStudioOutputLinks(currentOutputs, savedOutputs),
+      );
+      persistPosts(
+        appendApprovedPostDurableOutputs(
+          posts,
+          post.id,
+          savedOutputs.map(stripSignedOutputFields),
+        ),
+      );
+      setStorageStatus(`${savedOutputs.length} arquivo(s) salvo(s) no storage.`);
+    } catch (error) {
+      setStorageStatus(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel salvar os arquivos no storage.",
+      );
+    } finally {
+      setIsSavingDurableOutputs(false);
     }
   }
 
@@ -680,53 +710,7 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
 
     try {
       const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}-carrossel`;
-      const files: ZipDownloadFile[] = [];
-
-      for (const slide of post.carouselPackage.slides) {
-        const svg = renderCarouselSlideSvg(
-          post.carouselPackage,
-          slide,
-          view.brand,
-        );
-        const pngBlob = await svgToPngBlob(svg);
-
-        files.push({
-          name: `slides/slide-${String(slide.index).padStart(2, "0")}.png`,
-          content: pngBlob,
-        });
-      }
-
-      files.push(
-        {
-          name: "copy/legenda.txt",
-          content: view.caption,
-        },
-        {
-          name: "copy/primeiro-comentario.txt",
-          content: view.firstComment || "",
-        },
-        {
-          name: "copy/hashtags.txt",
-          content: view.hashtags || "",
-        },
-        {
-          name: "roteiro.txt",
-          content: buildCarouselScript(post),
-        },
-        {
-          name: "metadata.json",
-          content: JSON.stringify(
-            {
-              postId: post.id,
-              title: post.title,
-              brandName: post.brandName,
-              carouselPackage: post.carouselPackage,
-            },
-            null,
-            2,
-          ),
-        },
-      );
+      const files = await buildCarouselZipFiles(post, view);
 
       await downloadZipFile(files, `${baseFileName}.zip`);
       persistPosts(updateApprovedPostStatus(posts, post.id, "exported"));
@@ -1238,6 +1222,20 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           >
             Baixar pacote final
           </button>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={saveDurableOutputs}
+            disabled={
+              !view ||
+              post.finalPackageStatus !== "ready" ||
+              isSavingDurableOutputs
+            }
+          >
+            {isSavingDurableOutputs
+              ? "Salvando arquivos..."
+              : "Salvar no storage"}
+          </button>
         </div>
 
         <p className="approved-detail-muted">
@@ -1246,6 +1244,45 @@ export function ApprovedPostDetail({ postId }: ApprovedPostDetailProps) {
           hashtags, pacote de copy, prompt do asset, metadados e carrossel
           aprovado quando houver.
         </p>
+
+        <div className="durable-output-panel">
+          <div>
+            <strong>Arquivos duraveis</strong>
+            <span>{storageStatus}</span>
+          </div>
+          {durableOutputs.length ? (
+            <div className="durable-output-list">
+              {durableOutputs.slice(0, 12).map((output) => (
+                <article className="durable-output-item" key={output.id}>
+                  <div>
+                    <strong>{output.label || outputKindLabels[output.kind]}</strong>
+                    <span>
+                      {output.fileName} | {formatBytes(output.sizeBytes)}
+                    </span>
+                  </div>
+                  {output.signedUrl ? (
+                    <a
+                      className="secondary-button"
+                      href={output.signedUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Abrir
+                    </a>
+                  ) : (
+                    <span className="durable-output-missing-link">
+                      Link indisponivel
+                    </span>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="approved-detail-muted">
+              Nenhum arquivo duravel salvo para este pacote ainda.
+            </p>
+          )}
+        </div>
       </section>
 
       {copyQualityReport ? (
@@ -1862,6 +1899,287 @@ type FinalPackageFileManifestOptions = {
   fileNames: string[];
 };
 
+async function buildFinalPackageFiles(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+) {
+  const exportSvg = view.assetSvg || view.svg;
+  const pngBlob = await svgToPngBlob(exportSvg);
+  const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}`;
+  const files: ZipDownloadFile[] = [
+    {
+      name: "01-post/post-final-1080x1350.png",
+      content: pngBlob,
+    },
+    {
+      name: "01-post/post-final.svg",
+      content: exportSvg,
+    },
+    {
+      name: "02-copy/legenda.txt",
+      content: view.caption,
+    },
+    {
+      name: "02-copy/primeiro-comentario.txt",
+      content: view.firstComment || "",
+    },
+    {
+      name: "02-copy/hashtags.txt",
+      content: view.hashtags || "",
+    },
+    {
+      name: "02-copy/post-completo.txt",
+      content: buildReadyToPublishCopy(view),
+    },
+    {
+      name: "02-copy/pacote-copy.md",
+      content: buildCopyPackageMarkdown(post, view),
+    },
+    {
+      name: "04-assets/asset-prompt.txt",
+      content: view.selectedAsset?.prompt || "Sem asset visual selecionado.",
+    },
+    {
+      name: "05-metadata/post.json",
+      content: JSON.stringify(buildFinalPackageMetadata(post, view), null, 2),
+    },
+    {
+      name: "05-metadata/visual-history.json",
+      content: JSON.stringify(post.visualEvents, null, 2),
+    },
+    {
+      name: "05-metadata/carousel-history.json",
+      content: JSON.stringify(post.carouselEvents, null, 2),
+    },
+  ];
+
+  if (view.selectedAsset?.dataUrl) {
+    files.push({
+      name: "04-assets/selected-asset.png",
+      content: dataUrlToBlob(view.selectedAsset.dataUrl),
+    });
+  } else {
+    files.push({
+      name: "04-assets/README.md",
+      content:
+        "Este pacote usa apenas a composicao tipografica renderizada pelo sistema. Nao ha asset visual separado.",
+    });
+  }
+
+  const carouselIncluded = await appendFinalPackageCarouselFiles(
+    files,
+    post,
+    view,
+  );
+  const readmeName = "README.md";
+  const manifestName = "05-metadata/manifest.json";
+  const packageFileNames = [
+    readmeName,
+    ...files.map((file) => file.name),
+    manifestName,
+  ];
+
+  files.unshift({
+    name: readmeName,
+    content: buildFinalPackageReadme(post, view, {
+      carouselIncluded,
+      fileNames: packageFileNames,
+    }),
+  });
+  files.push({
+    name: manifestName,
+    content: JSON.stringify(
+      buildFinalPackageManifest(post, view, {
+        carouselIncluded,
+        fileNames: packageFileNames,
+      }),
+      null,
+      2,
+    ),
+  });
+
+  return {
+    baseFileName,
+    carouselIncluded,
+    files,
+  };
+}
+
+async function buildDurableUploadFiles(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+) {
+  const exportSvg = view.assetSvg || view.svg;
+  const finalPngBlob = await svgToPngBlob(exportSvg);
+  const baseFileName = `${slugify(post.brandName || "social-studio")}-${slugify(post.title)}`;
+  const uploadFiles: DurableUploadFile[] = [
+    {
+      kind: "final_post_png",
+      label: "PNG final 1080x1350",
+      fileName: `${baseFileName}-post-final.png`,
+      content: finalPngBlob,
+      contentType: "image/png",
+      metadata: {
+        postId: post.id,
+        title: post.title,
+        source: "final-package",
+      },
+    },
+    {
+      kind: "final_post_svg",
+      label: "SVG fonte do post",
+      fileName: `${baseFileName}-post-final.svg`,
+      content: exportSvg,
+      contentType: "image/svg+xml;charset=utf-8",
+      metadata: {
+        postId: post.id,
+        title: post.title,
+        source: "final-package",
+      },
+    },
+  ];
+
+  if (view.selectedAsset?.dataUrl) {
+    uploadFiles.push({
+      kind: "selected_asset",
+      label: "Asset visual selecionado",
+      fileName: `${baseFileName}-asset-selecionado.png`,
+      content: dataUrlToBlob(view.selectedAsset.dataUrl),
+      contentType: view.selectedAsset.mediaType || "image/png",
+      metadata: {
+        assetId: view.selectedAsset.id,
+        provider: view.selectedAsset.provider,
+        model: view.selectedAsset.model,
+      },
+    });
+  }
+
+  if (post.carouselPackage && post.carouselStatus === "approved") {
+    for (const slide of post.carouselPackage.slides) {
+      const slideNumber = String(slide.index).padStart(2, "0");
+      const svg = renderCarouselSlideSvg(post.carouselPackage, slide, view.brand);
+      const pngBlob = await svgToPngBlob(svg);
+
+      uploadFiles.push(
+        {
+          kind: "carousel_slide_png",
+          label: `Slide ${slideNumber} PNG`,
+          fileName: `${baseFileName}-slide-${slideNumber}.png`,
+          content: pngBlob,
+          contentType: "image/png",
+          metadata: {
+            carouselId: post.carouselPackage.id,
+            slideId: slide.id,
+            slideIndex: slide.index,
+          },
+        },
+        {
+          kind: "carousel_slide_svg",
+          label: `Slide ${slideNumber} SVG`,
+          fileName: `${baseFileName}-slide-${slideNumber}.svg`,
+          content: svg,
+          contentType: "image/svg+xml;charset=utf-8",
+          metadata: {
+            carouselId: post.carouselPackage.id,
+            slideId: slide.id,
+            slideIndex: slide.index,
+          },
+        },
+      );
+    }
+
+    const carouselZipBlob = await createZipBlob(
+      await buildCarouselZipFiles(post, view),
+    );
+
+    uploadFiles.push({
+      kind: "carousel_zip",
+      label: "ZIP do carrossel",
+      fileName: `${baseFileName}-carrossel.zip`,
+      content: carouselZipBlob,
+      contentType: "application/zip",
+      metadata: {
+        carouselId: post.carouselPackage.id,
+        slideCount: post.carouselPackage.slides.length,
+      },
+    });
+  }
+
+  const finalPackage = await buildFinalPackageFiles(post, view);
+  const finalZipBlob = await createZipBlob(finalPackage.files);
+
+  uploadFiles.push({
+    kind: "final_package_zip",
+    label: "ZIP final completo",
+    fileName: `${finalPackage.baseFileName}-pacote-final.zip`,
+    content: finalZipBlob,
+    contentType: "application/zip",
+    metadata: {
+      postId: post.id,
+      title: post.title,
+      carouselIncluded: finalPackage.carouselIncluded,
+      fileCount: finalPackage.files.length,
+    },
+  });
+
+  return uploadFiles;
+}
+
+async function buildCarouselZipFiles(
+  post: ApprovedPost,
+  view: ApprovedPostView,
+) {
+  if (!post.carouselPackage) {
+    return [];
+  }
+
+  const files: ZipDownloadFile[] = [];
+
+  for (const slide of post.carouselPackage.slides) {
+    const svg = renderCarouselSlideSvg(post.carouselPackage, slide, view.brand);
+    const pngBlob = await svgToPngBlob(svg);
+
+    files.push({
+      name: `slides/slide-${String(slide.index).padStart(2, "0")}.png`,
+      content: pngBlob,
+    });
+  }
+
+  files.push(
+    {
+      name: "copy/legenda.txt",
+      content: view.caption,
+    },
+    {
+      name: "copy/primeiro-comentario.txt",
+      content: view.firstComment || "",
+    },
+    {
+      name: "copy/hashtags.txt",
+      content: view.hashtags || "",
+    },
+    {
+      name: "roteiro.txt",
+      content: buildCarouselScript(post),
+    },
+    {
+      name: "metadata.json",
+      content: JSON.stringify(
+        {
+          postId: post.id,
+          title: post.title,
+          brandName: post.brandName,
+          carouselPackage: post.carouselPackage,
+        },
+        null,
+        2,
+      ),
+    },
+  );
+
+  return files;
+}
+
 async function appendFinalPackageCarouselFiles(
   files: ZipDownloadFile[],
   post: ApprovedPost,
@@ -2140,4 +2458,58 @@ function dataUrlToBlob(dataUrl: string) {
   }
 
   return new Blob([bytes], { type: mimeType });
+}
+
+async function blobToBase64(blob: Blob) {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
+    reader.readAsDataURL(blob);
+  });
+
+  return dataUrl.split(",")[1] || "";
+}
+
+function mergeStudioOutputLinks(
+  currentOutputs: StudioOutputLink[],
+  nextOutputs: StudioOutputLink[],
+) {
+  const outputsByPath = new Map<string, StudioOutputLink>();
+
+  for (const output of [...currentOutputs, ...nextOutputs]) {
+    outputsByPath.set(output.objectPath, output);
+  }
+
+  return [...outputsByPath.values()].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+function mergeDurableOutputLinks(
+  durableOutputs: StudioOutputRecord[],
+  signedOutputs: StudioOutputLink[],
+) {
+  const signedByPath = new Map(
+    signedOutputs.map((output) => [output.objectPath, output]),
+  );
+
+  return durableOutputs.map((output) => ({
+    ...output,
+    signedUrl: signedByPath.get(output.objectPath)?.signedUrl,
+    signedUrlExpiresAt: signedByPath.get(output.objectPath)?.signedUrlExpiresAt,
+  })) satisfies DurableOutputDisplay[];
+}
+
+function formatBytes(value: number) {
+  if (!value) {
+    return "0 KB";
+  }
+
+  if (value < 1024 * 1024) {
+    return `${Math.max(1, Math.round(value / 1024))} KB`;
+  }
+
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }

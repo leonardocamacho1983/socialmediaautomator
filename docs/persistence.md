@@ -28,7 +28,7 @@ Not included:
 - Supabase Auth;
 - multiple users;
 - row ownership;
-- storage bucket for image binaries;
+- durable file storage, added separately in Marco 8;
 - Zernio;
 - publishing;
 - scheduling;
@@ -101,6 +101,7 @@ database access only.
 
 ## Runtime Behavior
 
+Marco 8 adds durable file storage separately from project snapshot persistence.
 The app still writes localStorage first for continuity:
 
 ```text

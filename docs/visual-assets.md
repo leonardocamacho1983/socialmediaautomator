@@ -55,8 +55,7 @@ asset.
 
 ## Not Included
 
-- Supabase persistence;
-- Vercel Blob or durable asset storage;
+- durable asset storage, added in Marco 8 for final outputs;
 - Recraft direct API;
 - background removal;
 - inpainting;
@@ -108,9 +107,10 @@ finalPackageStatus: ApprovedPostFinalPackageStatus
 finalPackageReadyAt: string | null
 ```
 
-The assets are currently stored as data URLs in browser localStorage and capped
-to the latest 8 images per post. This is acceptable for the current internal
-preview, but not for durable production storage.
+Generated asset options are still kept as data URLs in browser localStorage
+during exploration and capped to the latest 8 images per post. When the final
+package is ready, Marco 8 can persist the selected asset and final outputs to
+private Supabase Storage.
 
 ## Validation
 

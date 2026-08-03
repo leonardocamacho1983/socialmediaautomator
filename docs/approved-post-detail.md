@@ -44,10 +44,11 @@ Included:
   detail page.
 - apply a deterministic first-comment suggestion when the gate blocks weak or
   mechanical comment copy.
+- save final PNG, final SVG, selected asset, carousel slides, carousel ZIP, and
+  final package ZIP to durable storage.
 
 Not included:
 
-- Supabase persistence;
 - Zernio;
 - scheduling or publishing;
 - analytics;
@@ -71,13 +72,14 @@ Marco 4.0 adds `generatedAssets` and `selectedVisualAssetId`. Marco 4.1 adds
 `visualAssetRejections`. Marco 4.2 adds `visualEvents`,
 `finalPackageStatus`, and `finalPackageReadyAt`. Marco 5 adds
 `carouselPackage`. Marco 6 does not add a new storage field; it derives the
-quality report from the current stored copy. Older records without asset fields
-are normalized to an empty asset list, no selected asset, the default
-composition, typographic-only visual status, empty visual history, package
-status open, and no carousel package.
+quality report from the current stored copy. Marco 8 adds `durableOutputs` as
+lightweight metadata for files saved in Supabase Storage. Older records without
+asset fields are normalized to an empty asset list, no selected asset, the
+default composition, typographic-only visual status, empty visual history,
+package status open, no carousel package, and no durable outputs.
 
-This is still browser-local state. It is not a durable production content
-database.
+The approved post snapshot is still cached in the browser, synchronized to the
+project database, and now can point to durable files in private storage.
 
 ## Validation
 
